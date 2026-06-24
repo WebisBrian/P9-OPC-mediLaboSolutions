@@ -6,10 +6,12 @@ import com.medilabo.patientservice.exception.PatientNotFoundException;
 import com.medilabo.patientservice.mapper.PatientMapper;
 import com.medilabo.patientservice.model.Patient;
 import com.medilabo.patientservice.repository.PatientRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class PatientService {
 
@@ -35,14 +37,18 @@ public class PatientService {
 
     public PatientResponse create(PatientRequest request) {
         Patient patient = patientMapper.toEntity(request);
-        return patientMapper.toResponse(patientRepository.save(patient));
+        PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
+        log.info("Patient created with id {}", response.getId());
+        return response;
     }
 
     public PatientResponse update(Long id, PatientRequest request) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
         patientMapper.updateEntity(patient, request);
-        return patientMapper.toResponse(patientRepository.save(patient));
+        PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
+        log.info("Patient updated with id {}", id);
+        return response;
     }
 
     public void delete(Long id) {
@@ -50,5 +56,6 @@ public class PatientService {
             throw new PatientNotFoundException(id);
         }
         patientRepository.deleteById(id);
+        log.info("Patient deleted with id {}", id);
     }
 }

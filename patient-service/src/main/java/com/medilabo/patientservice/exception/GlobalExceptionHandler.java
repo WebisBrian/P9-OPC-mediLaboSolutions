@@ -1,5 +1,6 @@
 package com.medilabo.patientservice.exception;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -10,11 +11,13 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(PatientNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handlePatientNotFound(PatientNotFoundException ex) {
+        log.warn("Patient not found: {}", ex.getMessage());
         Map<String, Object> body = Map.of(
                 "timestamp", Instant.now().toString(),
                 "status", HttpStatus.NOT_FOUND.value(),
@@ -32,6 +35,7 @@ public class GlobalExceptionHandler {
                         (existing, replacement) -> existing
                 ));
 
+        log.warn("Validation failed: {}", fieldErrors.keySet());
         Map<String, Object> body = Map.of(
                 "timestamp", Instant.now().toString(),
                 "status", HttpStatus.BAD_REQUEST.value(),
