@@ -13,3 +13,5 @@ VALUES (3, 'Test', 'TestInDanger', '2004-06-18', 'M', '3 Club Road', '300-444-55
 INSERT INTO patients (id, first_name, last_name, birth_date, gender, address, phone)
 VALUES (4, 'Test', 'TestEarlyOnset', '2002-06-28', 'F', '4 Valley Dr', '400-555-6666')
     ON CONFLICT (id) DO NOTHING;
+
+SELECT setval('patients_id_seq', (SELECT MAX(id) FROM patients));
