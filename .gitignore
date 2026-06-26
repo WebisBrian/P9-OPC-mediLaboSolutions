@@ -33,6 +33,8 @@ build/
 .vscode/
 
 ### Secrets ###
-.env
-.env.*
-!.env.example
+# Ignore tous les .env à tout niveau (racine + chaque service)
+**/.env
+**/.env.*
+# Mais garde les templates .env.example suivis (à tout niveau)
+!**/.env.example
