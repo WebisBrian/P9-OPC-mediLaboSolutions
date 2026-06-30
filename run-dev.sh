@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-VALID_SERVICES="patient-service gateway-service"
+VALID_SERVICES="patient-service gateway-service frontend-service"
 USAGE="Usage: $0 <service>
 Services disponibles : $VALID_SERVICES"
 

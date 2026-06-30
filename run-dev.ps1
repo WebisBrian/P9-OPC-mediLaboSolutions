@@ -2,7 +2,7 @@ param(
     [string]$Service = ""
 )
 
-$ValidServices = @("patient-service", "gateway-service")
+$ValidServices = @("patient-service", "gateway-service", "frontend-service", "appointment-service", "doctor-service", "notification-service")
 $UsageMsg = "Usage: .\run-dev.ps1 <service>`nServices disponibles : $($ValidServices -join ', ')"
 
 if (-not $Service) {
