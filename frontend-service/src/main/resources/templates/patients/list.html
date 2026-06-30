@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Patients — MédiLabo Solutions')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div class="container">
+    <h2 class="mb-3">Liste des patients</h2>
+    <table class="table table-bordered table-hover">
+        <thead class="table-dark">
+        <tr>
+            <th>Prénom</th>
+            <th>Nom</th>
+            <th>Date de naissance</th>
+            <th>Genre</th>
+            <th>Adresse</th>
+            <th>Téléphone</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="patient : ${patients}">
+            <td th:text="${patient.firstName()}"></td>
+            <td th:text="${patient.lastName()}"></td>
+            <td th:text="${patient.birthdate()}"></td>
+            <td th:text="${patient.gender()}"></td>
+            <td th:text="${patient.address()}"></td>
+            <td th:text="${patient.phone()}"></td>
+        </tr>
+        <tr th:if="${#lists.isEmpty(patients)}">
+            <td colspan="6" class="text-center text-muted">Aucun patient enregistré.</td>
+        </tr>
+        </tbody>
+    </table>
+</div>
+</body>
+</html>

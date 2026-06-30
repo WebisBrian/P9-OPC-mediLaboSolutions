@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title}">MédiLabo Solutions</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}">
+</head>
+<body>
+    <nav th:fragment="navbar" class="navbar navbar-dark bg-dark mb-4">
+        <div class="container-fluid">
+            <span class="navbar-brand fw-bold">MédiLabo Solutions</span>
+            <a th:href="@{/logout}" class="btn btn-outline-light btn-sm">Déconnexion</a>
+        </div>
+    </nav>
+</body>
+</html>
