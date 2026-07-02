@@ -153,6 +153,149 @@ class PatientControllerTest {
         verify(patientService, never()).create(any());
     }
 
+    // --- POST /patients — format/length validation (new constraints) ---
+
+    @Test
+    void should_Return400WithFirstNameError_When_FirstNameContainsDigits() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setFirstName("John3");
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.firstName").exists());
+
+        verify(patientService, never()).create(any());
+    }
+
+    @Test
+    void should_Return400WithLastNameError_When_LastNameContainsInvalidChar() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setLastName("Doe@");
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.lastName").exists());
+
+        verify(patientService, never()).create(any());
+    }
+
+    @Test
+    void should_Return400WithFirstNameError_When_FirstNameExceedsMaxLength() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setFirstName("A".repeat(101));
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.firstName").exists());
+
+        verify(patientService, never()).create(any());
+    }
+
+    @Test
+    void should_Return400WithPhoneError_When_PhoneContainsLetters() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setPhone("abc123");
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.phone").exists());
+
+        verify(patientService, never()).create(any());
+    }
+
+    @Test
+    void should_Return400WithPhoneError_When_PhoneExceedsMaxLength() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setPhone("123456789012345678901"); // 21 chars
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors.phone").exists());
+
+        verify(patientService, never()).create(any());
+    }
+
+    @Test
+    void should_Return201_When_FirstNameHasHyphenAndLastNameHasApostrophe() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setFirstName("Jean-Pierre");
+        request.setLastName("O'Brien");
+        PatientResponse created = buildResponse(1L, "Jean-Pierre", "O'Brien");
+        when(patientService.create(any(PatientRequest.class))).thenReturn(created);
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void should_Return201_When_LastNameHasParticleWithSpaces() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setLastName("de la Fontaine");
+        PatientResponse created = buildResponse(1L, "John", "de la Fontaine");
+        when(patientService.create(any(PatientRequest.class))).thenReturn(created);
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void should_Return201_When_PhoneIsEmpty() throws Exception {
+        // Arrange
+        PatientRequest request = buildValidRequest();
+        request.setPhone("");
+        PatientResponse created = buildResponse(1L, "John", "Doe");
+        when(patientService.create(any(PatientRequest.class))).thenReturn(created);
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    void should_Return201_When_AddressAndPhoneAreNull() throws Exception {
+        // Arrange
+        PatientRequest request = new PatientRequest("John", "Doe",
+                LocalDate.of(1980, 6, 15), Gender.M, null, null);
+        PatientResponse created = buildResponse(1L, "John", "Doe");
+        when(patientService.create(any(PatientRequest.class))).thenReturn(created);
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated());
+    }
+
     // --- PUT /patients/{id} ---
 
     @Test
