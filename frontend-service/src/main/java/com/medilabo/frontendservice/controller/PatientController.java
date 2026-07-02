@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 
@@ -65,7 +66,7 @@ public class PatientController {
     }
 
     @GetMapping("/patients/{id}")
-    public String showDetail(@PathVariable Long id, Model model) {
+    public String showDetail(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
         try {
             PatientDto patient = patientGatewayClient.findById(id);
             model.addAttribute("patient", patient);
@@ -75,12 +76,13 @@ public class PatientController {
             return "redirect:/login";
         } catch (HttpClientErrorException.NotFound e) {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
+            redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
         }
     }
 
     @GetMapping("/patients/{id}/edit")
-    public String showEditForm(@PathVariable Long id, Model model) {
+    public String showEditForm(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
         try {
             PatientDto patient = patientGatewayClient.findById(id);
             model.addAttribute("patientForm", toForm(patient));
@@ -91,6 +93,7 @@ public class PatientController {
             return "redirect:/login";
         } catch (HttpClientErrorException.NotFound e) {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
+            redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
         }
     }
@@ -100,7 +103,8 @@ public class PatientController {
             @PathVariable Long id,
             @Valid @ModelAttribute PatientForm patientForm,
             BindingResult bindingResult,
-            Model model) {
+            Model model,
+            RedirectAttributes redirectAttributes) {
         if (bindingResult.hasErrors()) {
             model.addAttribute("patientId", id);
             return "patients/form";
@@ -113,6 +117,7 @@ public class PatientController {
             return "redirect:/login";
         } catch (HttpClientErrorException.NotFound e) {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
+            redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
         } catch (HttpClientErrorException e) {
             log.warn("Échec mise à jour patient via gateway : {}", e.getStatusCode());
@@ -123,7 +128,7 @@ public class PatientController {
     }
 
     @PostMapping("/patients/{id}/delete")
-    public String deletePatient(@PathVariable Long id) {
+    public String deletePatient(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         try {
             patientGatewayClient.delete(id);
             return "redirect:/patients";
@@ -132,6 +137,7 @@ public class PatientController {
             return "redirect:/login";
         } catch (HttpClientErrorException.NotFound e) {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
+            redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
         }
     }

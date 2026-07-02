@@ -10,7 +10,10 @@
     <nav th:fragment="navbar" class="navbar navbar-dark bg-dark mb-4">
         <div class="container-fluid">
             <span class="navbar-brand fw-bold">MédiLabo Solutions</span>
-            <a th:href="@{/logout}" class="btn btn-outline-light btn-sm">Déconnexion</a>
+            <div class="d-flex align-items-center gap-3">
+                <a th:href="@{/patients}" class="nav-link text-white">Patients</a>
+                <a th:href="@{/logout}" class="btn btn-outline-light btn-sm">Déconnexion</a>
+            </div>
         </div>
     </nav>
 </body>

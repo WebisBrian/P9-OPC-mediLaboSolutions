@@ -10,18 +10,18 @@ import java.time.LocalDate;
 
 public class PatientForm {
 
-    @NotBlank
+    @NotBlank(message = "Le prénom est obligatoire.")
     private String firstName;
 
-    @NotBlank
+    @NotBlank(message = "Le nom est obligatoire.")
     private String lastName;
 
-    @NotNull
-    @Past
+    @NotNull(message = "La date de naissance est obligatoire.")
+    @Past(message = "La date de naissance doit être dans le passé.")
     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
     private LocalDate birthDate;
 
-    @NotBlank
+    @NotBlank(message = "Le genre est obligatoire.")
     @Pattern(regexp = "M|F", message = "Le genre doit être M ou F.")
     private String gender;
 

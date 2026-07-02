@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Erreur — MédiLabo Solutions')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div class="container text-center mt-5" style="max-width: 600px;">
+    <h2 class="mb-3" th:text="${status == 404} ? 'Page introuvable' : 'Une erreur est survenue'">Erreur</h2>
+    <p class="text-muted mb-4">Code d'erreur : <strong th:text="${status}"></strong></p>
+    <a th:href="@{/patients}" class="btn btn-primary">Retour à la liste des patients</a>
+</div>
+</body>
+</html>
