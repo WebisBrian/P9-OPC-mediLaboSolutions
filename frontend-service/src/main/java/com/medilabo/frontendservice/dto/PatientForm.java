@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDate;
@@ -11,9 +12,13 @@ import java.time.LocalDate;
 public class PatientForm {
 
     @NotBlank(message = "Le prénom est obligatoire.")
+    @Size(max = 100, message = "Le prénom ne doit pas dépasser 100 caractères.")
+    @Pattern(regexp = "[\\p{L} '-]+", message = "Le prénom ne doit contenir que des lettres, espaces, tirets ou apostrophes.")
     private String firstName;
 
     @NotBlank(message = "Le nom est obligatoire.")
+    @Size(max = 100, message = "Le nom ne doit pas dépasser 100 caractères.")
+    @Pattern(regexp = "[\\p{L} '-]+", message = "Le nom ne doit contenir que des lettres, espaces, tirets ou apostrophes.")
     private String lastName;
 
     @NotNull(message = "La date de naissance est obligatoire.")
@@ -25,8 +30,11 @@ public class PatientForm {
     @Pattern(regexp = "M|F", message = "Le genre doit être M ou F.")
     private String gender;
 
+    @Size(max = 255, message = "L'adresse ne doit pas dépasser 255 caractères.")
     private String address;
 
+    @Size(max = 20, message = "Le téléphone ne doit pas dépasser 20 caractères.")
+    @Pattern(regexp = "[0-9 +().-]*", message = "Le téléphone ne doit contenir que des chiffres, espaces ou + ( ) . -")
     private String phone;
 
     public String getFirstName() { return firstName; }
