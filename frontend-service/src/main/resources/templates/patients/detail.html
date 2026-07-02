@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Détail patient — MédiLabo Solutions')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div class="container" style="max-width: 600px;">
+    <h2 class="mb-4">Détail du patient</h2>
+    <dl class="row">
+        <dt class="col-sm-4">Prénom</dt>
+        <dd class="col-sm-8" th:text="${patient.firstName()}"></dd>
+
+        <dt class="col-sm-4">Nom</dt>
+        <dd class="col-sm-8" th:text="${patient.lastName()}"></dd>
+
+        <dt class="col-sm-4">Date de naissance</dt>
+        <dd class="col-sm-8" th:text="${patient.birthDate()}"></dd>
+
+        <dt class="col-sm-4">Genre</dt>
+        <dd class="col-sm-8" th:text="${patient.gender()}"></dd>
+
+        <dt class="col-sm-4">Adresse</dt>
+        <dd class="col-sm-8" th:text="${patient.address()}"></dd>
+
+        <dt class="col-sm-4">Téléphone</dt>
+        <dd class="col-sm-8" th:text="${patient.phone()}"></dd>
+    </dl>
+    <a th:href="@{/patients/{id}/edit(id=${patient.id()})}" class="btn btn-warning me-2">Modifier</a>
+    <a th:href="@{/patients}" class="btn btn-secondary">Retour à la liste</a>
+</div>
+</body>
+</html>

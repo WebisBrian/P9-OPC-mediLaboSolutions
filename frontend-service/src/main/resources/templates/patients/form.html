@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('Patient — MédiLabo Solutions')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: navbar}"></nav>
+<div class="container" style="max-width: 600px;">
+    <h2 class="mb-4" th:text="${patientId != null} ? 'Modifier le patient' : 'Ajouter un patient'"></h2>
+
+    <div class="alert alert-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+    <form th:action="${patientId != null} ? @{/patients/{id}(id=${patientId})} : @{/patients}"
+          method="post"
+          th:object="${patientForm}">
+
+        <div class="mb-3">
+            <label for="firstName" class="form-label">Prénom <span class="text-danger">*</span></label>
+            <input type="text" id="firstName" class="form-control"
+                   th:field="*{firstName}"
+                   th:classappend="${#fields.hasErrors('firstName')} ? 'is-invalid'">
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('firstName')}" th:errors="*{firstName}"></div>
+        </div>
+
+        <div class="mb-3">
+            <label for="lastName" class="form-label">Nom <span class="text-danger">*</span></label>
+            <input type="text" id="lastName" class="form-control"
+                   th:field="*{lastName}"
+                   th:classappend="${#fields.hasErrors('lastName')} ? 'is-invalid'">
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('lastName')}" th:errors="*{lastName}"></div>
+        </div>
+
+        <div class="mb-3">
+            <label for="birthDate" class="form-label">Date de naissance <span class="text-danger">*</span></label>
+            <input type="date" id="birthDate" class="form-control"
+                   th:field="*{birthDate}"
+                   th:classappend="${#fields.hasErrors('birthDate')} ? 'is-invalid'">
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('birthDate')}" th:errors="*{birthDate}"></div>
+        </div>
+
+        <div class="mb-3">
+            <label for="gender" class="form-label">Genre <span class="text-danger">*</span></label>
+            <select id="gender" class="form-select"
+                    th:field="*{gender}"
+                    th:classappend="${#fields.hasErrors('gender')} ? 'is-invalid'">
+                <option value="">-- Sélectionner --</option>
+                <option value="M">Homme</option>
+                <option value="F">Femme</option>
+            </select>
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('gender')}" th:errors="*{gender}"></div>
+        </div>
+
+        <div class="mb-3">
+            <label for="address" class="form-label">Adresse</label>
+            <input type="text" id="address" class="form-control" th:field="*{address}">
+        </div>
+
+        <div class="mb-3">
+            <label for="phone" class="form-label">Téléphone</label>
+            <input type="text" id="phone" class="form-control" th:field="*{phone}">
+        </div>
+
+        <button type="submit" class="btn btn-primary me-2">Enregistrer</button>
+        <a th:href="@{/patients}" class="btn btn-secondary">Annuler</a>
+    </form>
+</div>
+</body>
+</html>

@@ -6,7 +6,7 @@ public record PatientDto(
         Long id,
         String firstName,
         String lastName,
-        LocalDate birthdate,
+        LocalDate birthDate,
         String gender,
         String address,
         String phone
