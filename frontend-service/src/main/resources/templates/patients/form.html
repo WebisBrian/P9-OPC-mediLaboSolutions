@@ -50,12 +50,18 @@
 
         <div class="mb-3">
             <label for="address" class="form-label">Adresse</label>
-            <input type="text" id="address" class="form-control" th:field="*{address}">
+            <input type="text" id="address" class="form-control"
+                   th:field="*{address}"
+                   th:classappend="${#fields.hasErrors('address')} ? 'is-invalid'">
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('address')}" th:errors="*{address}"></div>
         </div>
 
         <div class="mb-3">
             <label for="phone" class="form-label">Téléphone</label>
-            <input type="text" id="phone" class="form-control" th:field="*{phone}">
+            <input type="text" id="phone" class="form-control"
+                   th:field="*{phone}"
+                   th:classappend="${#fields.hasErrors('phone')} ? 'is-invalid'">
+            <div class="invalid-feedback" th:if="${#fields.hasErrors('phone')}" th:errors="*{phone}"></div>
         </div>
 
         <button type="submit" class="btn btn-primary me-2">Enregistrer</button>
