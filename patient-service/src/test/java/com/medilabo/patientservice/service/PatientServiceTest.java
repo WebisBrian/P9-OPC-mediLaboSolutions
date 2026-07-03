@@ -2,6 +2,7 @@ package com.medilabo.patientservice.service;
 
 import com.medilabo.patientservice.dto.PatientRequest;
 import com.medilabo.patientservice.dto.PatientResponse;
+import com.medilabo.patientservice.exception.DuplicatePatientException;
 import com.medilabo.patientservice.exception.PatientNotFoundException;
 import com.medilabo.patientservice.mapper.PatientMapper;
 import com.medilabo.patientservice.model.Gender;
@@ -156,6 +157,69 @@ class PatientServiceTest {
         assertThat(captured.getPhone()).isEqualTo("0600000001");
     }
 
+    // --- create : duplicate detection ---
+
+    @Test
+    void should_ThrowDuplicatePatientExceptionAndNeverSave_When_DuplicateFoundOnCreate() {
+        // Arrange
+        when(patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                "John", "Doe", LocalDate.of(1980, 6, 15), "0600000001"))
+                .thenReturn(Optional.of(samplePatient));
+
+        // Act & Assert
+        assertThatThrownBy(() -> patientService.create(sampleRequest))
+                .isInstanceOf(DuplicatePatientException.class);
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
+    void should_SaveSuccessfully_When_NoDuplicateFoundOnCreate() {
+        // Arrange
+        when(patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                "John", "Doe", LocalDate.of(1980, 6, 15), "0600000001"))
+                .thenReturn(Optional.empty());
+        when(patientRepository.save(any(Patient.class))).thenReturn(samplePatient);
+
+        // Act
+        PatientResponse result = patientService.create(sampleRequest);
+
+        // Assert
+        assertThat(result.getId()).isEqualTo(1L);
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    void should_SkipDuplicateCheckAndSave_When_PhoneIsNullOnCreate() {
+        // Arrange
+        PatientRequest requestWithNullPhone = new PatientRequest(
+                "John", "Doe", LocalDate.of(1980, 6, 15), Gender.M, "10 Main St", null);
+        when(patientRepository.save(any(Patient.class))).thenReturn(samplePatient);
+
+        // Act
+        patientService.create(requestWithNullPhone);
+
+        // Assert
+        verify(patientRepository, never()).findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                any(), any(), any(), any());
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    void should_SkipDuplicateCheckAndSave_When_PhoneIsEmptyOnCreate() {
+        // Arrange
+        PatientRequest requestWithEmptyPhone = new PatientRequest(
+                "John", "Doe", LocalDate.of(1980, 6, 15), Gender.M, "10 Main St", "");
+        when(patientRepository.save(any(Patient.class))).thenReturn(samplePatient);
+
+        // Act
+        patientService.create(requestWithEmptyPhone);
+
+        // Assert
+        verify(patientRepository, never()).findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                any(), any(), any(), any());
+        verify(patientRepository).save(any(Patient.class));
+    }
+
     // --- update ---
 
     @Test
@@ -193,6 +257,71 @@ class PatientServiceTest {
                 .isInstanceOf(PatientNotFoundException.class)
                 .hasMessageContaining("99");
 
+        verify(patientRepository, never()).save(any());
+    }
+
+    // --- update : duplicate detection ---
+
+    @Test
+    void should_ThrowDuplicatePatientExceptionAndNeverSave_When_DuplicateFoundOnUpdate() {
+        // Arrange
+        Patient anotherPatient = new Patient(2L, "John", "Doe", LocalDate.of(1980, 6, 15), Gender.M, "99 Other St", "0600000001");
+        when(patientRepository.findById(1L)).thenReturn(Optional.of(samplePatient));
+        when(patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                "John", "Doe", LocalDate.of(1980, 6, 15), "0600000001", 1L))
+                .thenReturn(Optional.of(anotherPatient));
+
+        // Act & Assert
+        assertThatThrownBy(() -> patientService.update(1L, sampleRequest))
+                .isInstanceOf(DuplicatePatientException.class);
+        verify(patientRepository, never()).save(any());
+    }
+
+    @Test
+    void should_SaveSuccessfully_When_NoDuplicateFoundOnUpdate() {
+        // Arrange
+        when(patientRepository.findById(1L)).thenReturn(Optional.of(samplePatient));
+        when(patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                "John", "Doe", LocalDate.of(1980, 6, 15), "0600000001", 1L))
+                .thenReturn(Optional.empty());
+        when(patientRepository.save(any(Patient.class))).thenReturn(samplePatient);
+
+        // Act
+        PatientResponse result = patientService.update(1L, sampleRequest);
+
+        // Assert
+        assertThat(result.getId()).isEqualTo(1L);
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    void should_SkipDuplicateCheckAndSave_When_PhoneIsNullOnUpdate() {
+        // Arrange
+        PatientRequest requestWithNullPhone = new PatientRequest(
+                "John", "Doe", LocalDate.of(1980, 6, 15), Gender.M, "10 Main St", null);
+        when(patientRepository.findById(1L)).thenReturn(Optional.of(samplePatient));
+        when(patientRepository.save(any(Patient.class))).thenReturn(samplePatient);
+
+        // Act
+        patientService.update(1L, requestWithNullPhone);
+
+        // Assert
+        verify(patientRepository, never()).findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                any(), any(), any(), any(), any());
+        verify(patientRepository).save(any(Patient.class));
+    }
+
+    @Test
+    void should_ThrowPatientNotFoundExceptionAndNeverCheckDuplicate_When_IdDoesNotExistOnUpdate() {
+        // Arrange
+        when(patientRepository.findById(99L)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThatThrownBy(() -> patientService.update(99L, sampleRequest))
+                .isInstanceOf(PatientNotFoundException.class)
+                .hasMessageContaining("99");
+        verify(patientRepository, never()).findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                any(), any(), any(), any(), any());
         verify(patientRepository, never()).save(any());
     }
 
