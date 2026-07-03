@@ -37,17 +37,7 @@ public class PatientService {
     }
 
     public PatientResponse create(PatientRequest request) {
-        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
-        if (phone != null && !phone.isEmpty()) {
-            String firstName = request.getFirstName().trim();
-            String lastName  = request.getLastName().trim();
-            patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
-                    firstName, lastName, request.getBirthDate(), phone)
-                .ifPresent(existing -> {
-                    log.warn("Duplicate patient creation attempt detected");
-                    throw new DuplicatePatientException();
-                });
-        }
+        checkForDuplicate(request, null);
         Patient patient = patientMapper.toEntity(request);
         PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
         log.info("Patient created with id {}", response.getId());
@@ -57,21 +47,29 @@ public class PatientService {
     public PatientResponse update(Long id, PatientRequest request) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
-        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
-        if (phone != null && !phone.isEmpty()) {
-            String firstName = request.getFirstName().trim();
-            String lastName  = request.getLastName().trim();
-            patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
-                    firstName, lastName, request.getBirthDate(), phone, id)
-                .ifPresent(existing -> {
-                    log.warn("Duplicate patient update attempt detected");
-                    throw new DuplicatePatientException();
-                });
-        }
+        checkForDuplicate(request, id);
         patientMapper.updateEntity(patient, request);
         PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
         log.info("Patient updated with id {}", id);
         return response;
+    }
+
+    private void checkForDuplicate(PatientRequest request, Long excludeId) {
+        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
+        if (phone == null || phone.isEmpty()) {
+            return;
+        }
+        String firstName = request.getFirstName().trim();
+        String lastName  = request.getLastName().trim();
+        boolean duplicate = excludeId == null
+                ? patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                        firstName, lastName, request.getBirthDate(), phone).isPresent()
+                : patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                        firstName, lastName, request.getBirthDate(), phone, excludeId).isPresent();
+        if (duplicate) {
+            log.warn("Duplicate patient detected");
+            throw new DuplicatePatientException();
+        }
     }
 
     public void delete(Long id) {
