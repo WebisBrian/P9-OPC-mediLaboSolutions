@@ -22,7 +22,7 @@ Application aidant les médecins à identifier les patients à risque (soins pr�
 
 Java 21 · **Spring Boot 3.5.x** · Maven · PostgreSQL via Spring Data JPA · MongoDB via Spring Data MongoDB · Spring Cloud Gateway · Spring Security · Lombok · Docker Compose.
 
-> ⚠️ **Ne PAS utiliser Spring Boot 4.x.** La 4.x (baseline Spring Framework 7) introduit la modularisation des starters de test (le package de `@WebMvcTest` change) et le passage à Jackson 3 (package `com.fasterxml.jackson` → `tools.jackson`, `ObjectMapper` → `JsonMapper`). Ces changements cassent le code calé sur les conventions 3.x et désalignent des cours/doc OPC. **Tout le projet reste en Spring Boot 3.5.x** (dernière 3.5 : 3.5.15). Générer chaque nouveau module en 3.5.x sur start.spring.io. Vérifier que la version de Spring Cloud sélectionnée est bien celle compatible 3.5.x.
+> ⚠️ **Ne PAS utiliser Spring Boot 4.x.** La 4.x (baseline Spring Framework 7) introduit la modularisation des starters de test (le package de `@WebMvcTest` change) et le passage à Jackson 3 (package `com.fasterxml.jackson` → `tools.jackson`, `ObjectMapper` → `JsonMapper`). Ces changements cassent le code calé sur les conventions 3.x et désalignent des cours/doc OPC. **Tout le projet reste en Spring Boot 3.5.x** (pom parent : 3.5.16). Générer chaque nouveau module en 3.5.x sur start.spring.io. Vérifier que la version de Spring Cloud sélectionnée est bien celle compatible 3.5.x.
 
 ### Outillage
 
@@ -51,6 +51,7 @@ model/        → entités (JPA pour patient, documents pour notes)
 dto/          → objets exposés par l'API
 mapper/       → mapping entité ↔ DTO (composant @Component injecté, pas statique)
 exception/    → exceptions métier nommées + @RestControllerAdvice
+security/     → configuration Spring (SecurityConfig, GatewaySecretFilter de provenance)
 ```
 
 ### Conventions
@@ -63,6 +64,18 @@ exception/    → exceptions métier nommées + @RestControllerAdvice
 - Javadoc sur l'API publique. Commentaires inline sur le *pourquoi* non-évident, pas sur les getters/setters/constructeurs triviaux.
 - Lombok pour le boilerplate (getters/setters, constructeurs, `@Slf4j`), sans masquer de logique.
 - Enums persistés en `EnumType.STRING` (lisibilité base + robustesse au réordonnancement), jamais `ORDINAL`.
+
+### Conventions front (frontend-service)
+
+Microservice indépendant, jamais incorporé au back. Spring MVC + Thymeleaf (server-side), pas de SPA.
+- **Pas de Spring Security sur le front.** Login maison léger : page de login, credentials utilisateur stockés en `HttpSession`, rejoués en HTTP Basic vers la gateway. Un `HandlerInterceptor` protège les routes (redirect `/login` si pas de session).
+- **RestClient** (pas WebClient, réactif inutile en MVC servlet ; pas RestTemplate).
+- **Un client par microservice back** : `PatientGatewayClient` (et `NoteGatewayClient` au S2, etc.). Un seul composant par domaine dialogue avec la gateway ; les controllers orchestrent. Mutualiser la mécanique d'auth (lecture session + header Basic) **quand le 2e client apparaît** (S2), pas avant (YAGNI).
+- **Séparation lecture/écriture** : DTO record immuable pour la lecture (désérialisation GET), classe Form mutable + Bean Validation pour les formulaires. Mapping manuel (pas de mapper framework côté front).
+- **Traduction verbes HTTP** : les formulaires HTML ne font que GET/POST ; le front expose `POST /x/{id}` (update) et `POST /x/{id}/delete`, le client traduit vers PUT/DELETE côté gateway.
+- **Pas de duplication d'un type interne du back** (ex. enum `Gender`) : manipuler des String côté front pour éviter le couplage.
+- **Bootstrap via WebJar**, zéro CSS custom, pas de toolchain Node. UI sobre (objectif démo).
+- Le `mapper/` obligatoire de la structure back **ne s'applique pas** au front (mapping manuel léger).
 
 ### Pragmatisme (important en contexte d'évaluation)
 
@@ -87,16 +100,33 @@ SOLID = boussole, pas dogme. Chaque abstraction doit se justifier par un besoin 
 - Un seul `spring-boot-starter-test` couvre JUnit 5, Mockito, AssertJ, MockMvc. Ne pas inventer de starters de test par dépendance.
 - Prioriser ce qui protège réellement contre la régression, pas la couverture exhaustive.
 
+Les services back portant le GatewaySecretFilter doivent fournir gateway.secret aux tests qui chargent le contexte (@TestPropertySource ou config de test), sinon le fail-fast empêche le démarrage. Isoler les tests @WebMvcTest de la sécurité via excludeAutoConfiguration.
+
 ---
 
 ## Sécurité
 
-- **Spring Security centralisé à la gateway** (point d'authentification unique ; les microservices back sont en confiance derrière). Décision validée avec le mentor, réversible si contre-ordre — l'énoncé suggérait à l'origine une security par service.
-- Authentification HTTP basic, utilisateurs in-memory, mots de passe encodés **BCrypt** (obligatoire). Pas d'inscription, pas de rôles/droits.
-- Config Spring Security : utiliser la **doc Spring Boot 3.5 / Spring Framework 6** (style `SecurityFilterChain` en bean, pas l'ancien `WebSecurityConfigurerAdapter` déprécié).
-- **Secrets** : aucun secret, mot de passe ou credential en dur dans le code ou les fichiers versionnés. Credentials DB (Postgres, Mongo) et config sensible via variables d'environnement, `.env` dans `.gitignore` (un `.env.example` versionné sert de modèle). La config Docker Compose lit ces variables, ne les code pas en dur.
-- **Validation des entrées multi-couches** : Bean Validation sur les DTOs (web, `@Valid`), règles métier en Java pur (assessment), préconditions (existence/état) dans la couche service. Chaque couche se protège, pas de confiance aveugle dans la précédente.
+Trois segments, trois mécanismes (décision définitive, validée mentor) :
 
+| Segment | Mécanisme |
+|---|---|
+| navigateur ↔ frontend | Session serveur (`JSESSIONID`) |
+| frontend ↔ gateway | HTTP Basic (creds utilisateur rejoués depuis la session) |
+| gateway ↔ services back | Secret partagé (header `X-Gateway-Secret`) |
+
+- **Auth utilisateur centralisée à la gateway** : HTTP Basic, utilisateurs in-memory, mots de passe BCrypt (obligatoire). Pas d'inscription, pas de rôles. Gateway = WebFlux réactif → `SecurityWebFilterChain` + `ServerHttpSecurity` en bean (PAS `SecurityFilterChain`/`HttpSecurity`, qui sont l'API servlet réservée aux backs ; PAS de `WebSecurityConfigurerAdapter` déprécié).
+- **Stack de sécurité selon le module** : gateway = réactive (`SecurityWebFilterChain` + `ServerHttpSecurity`) car WebFlux ; services back = servlet (`SecurityFilterChain` + `HttpSecurity`) car MVC/Tomcat. Ne jamais copier le pattern d'un module vers l'autre sans adapter la stack.
+- **Provenance des requêtes (chaque service back)** : un `GatewaySecretFilter` (`OncePerRequestFilter`) valide le header `X-Gateway-Secret` (comparaison constant-time, fail-fast si le secret est absent au démarrage). Absent/faux → 403. La gateway injecte le secret via `AddRequestHeader` sur la route du service. **Tout nouveau service back (ex. notes-service au S2) doit porter ce filtre + sa route gateway doit ajouter le header.**
+- Principe : *centralisé ≠ exclusif*. Le back ne ré-authentifie pas l'utilisateur ; il vérifie seulement qu'une requête vient bien de la gateway. Défense en profondeur = secret + isolation réseau Docker (S5).
+- **Secrets** : aucun secret en dur. Credentials (auth gateway, DB Postgres/Mongo, `X-Gateway-Secret`) via variables d'env / `.env` (gitignore, `.env.example` versionné). Docker Compose lit ces variables.
+- Le **front n'a pas de `.env`** : pas de compte de service, les credentials viennent de l'utilisateur via une page de login (login maison léger, pas de Spring Security sur le front — voir conventions front).
+
+### Validation (multi-couches, règle du projet)
+- **Back = rempart d'intégrité** : Bean Validation `@Valid` sur les DTO d'entrée (présence + format + longueur), règles métier en Java (assessment), préconditions dans le service. Le back ne fait jamais confiance à l'extérieur, **y compris au frontend** (un appel direct à la gateway contourne le front).
+- **Front = UX** : mêmes règles de format/longueur répliquées sur les formulaires (feedback immédiat), mais le front ne garantit rien — il ne fait que du confort.
+- **Règles identiques des deux côtés, SANS partage de code** (pas de module commun : couplage entre microservices écarté). Discipline de cohérence, pas de dépendance partagée.
+- Règles patient de référence : nom/prénom `@Size(max=100)` + `@Pattern([\p{L} '-]+)` (lettres Unicode + espace/tiret/apostrophe, pas de chiffres) ; phone `@Size(max=20)` + `@Pattern([0-9 +().-]*)` ; address `@Size(max=255)`.
+- **Déduplication métier** (relationnelle, back uniquement — le front ne peut pas la vérifier localement) : un doublon lève une exception métier → **409 Conflict**, que le front traduit en message utilisateur clair.
 ---
 
 ## Gestion d'erreurs
@@ -146,6 +176,9 @@ Toute feature documentée dans `docs/features/<feature>.md` : résumé, endpoint
 Patient (S1) → Notes (S2) → Assessment (S3), puis Docker et Green Code. Chaque service back est généré **au moment de son sprint**. Ne pas scaffolder de service non encore abordé.
 
 ### État d'avancement
-
-- **S1 — patient-service : terminé.** CRUD complet (5 endpoints REST sous `/patients`), architecture en couches, enum `Gender` (EnumType.STRING), validation `@Valid`, `GlobalExceptionHandler` (404/400), logging SLF4J, 21 tests verts (service unitaire + controller `@WebMvcTest` sur H2), seeding `data.sql` idempotent des 4 patients OPC (+ `setval` sur la séquence). Validé en Postman. Spring Boot 3.5.15.
-- **S1 — en cours : gateway-service** (Spring Cloud Gateway + Spring Security centralisée) et **frontend-service** (UI sobre indépendante).
+- **S1 — TERMINÉ** (patient-service, gateway-service, frontend-service).
+    - patient-service : CRUD `/patients`, validation durcie (format/longueur), dédup patient (409), `GlobalExceptionHandler` (404/409/400), `GatewaySecretFilter` (provenance), seeding 4 patients OPC, tests verts. SB 3.5.x.
+    - gateway-service : Spring Cloud Gateway, route `/patients/**`, auth Basic centralisée (BCrypt, in-memory), injection `X-Gateway-Secret` vers le back.
+    - frontend-service : UI Thymeleaf sobre, login maison, `PatientGatewayClient`, CRUD complet, validation alignée + gestion 409.
+    - Détail complet : `docs/SPRINT1.md` (si généré) ou rapport de fin de sprint.
+- **S2 — à démarrer** : notes-service (MongoDB) + `NoteGatewayClient` au front + route gateway avec secret. notes-service doit reproduire le `GatewaySecretFilter`.
