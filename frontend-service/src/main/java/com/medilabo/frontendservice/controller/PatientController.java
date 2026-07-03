@@ -58,6 +58,10 @@ public class PatientController {
         } catch (HttpClientErrorException.Unauthorized e) {
             log.warn("Appel gateway non autorisé (session invalide/expirée) : {}", e.getStatusCode());
             return "redirect:/login";
+        } catch (HttpClientErrorException.Conflict e) {
+            log.warn("Doublon patient refusé par le back : {}", e.getStatusCode());
+            model.addAttribute("errorMessage", "Un patient identique existe déjà.");
+            return "patients/form";
         } catch (HttpClientErrorException e) {
             log.warn("Échec création patient via gateway : {}", e.getStatusCode());
             model.addAttribute("errorMessage", "Les données envoyées sont invalides.");
@@ -119,6 +123,11 @@ public class PatientController {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
             redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
+        } catch (HttpClientErrorException.Conflict e) {
+            log.warn("Doublon patient refusé par le back : {}", e.getStatusCode());
+            model.addAttribute("patientId", id);
+            model.addAttribute("errorMessage", "Un patient identique existe déjà.");
+            return "patients/form";
         } catch (HttpClientErrorException e) {
             log.warn("Échec mise à jour patient via gateway : {}", e.getStatusCode());
             model.addAttribute("patientId", id);
