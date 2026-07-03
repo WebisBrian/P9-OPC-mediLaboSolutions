@@ -8,6 +8,8 @@ spring:
               uri: http://localhost:8081
               predicates:
                 - Path=/patients/**
+              filters:
+                - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
 
 server:
   port: 8080
