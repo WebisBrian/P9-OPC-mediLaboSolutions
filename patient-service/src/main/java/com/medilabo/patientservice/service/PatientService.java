@@ -2,6 +2,7 @@ package com.medilabo.patientservice.service;
 
 import com.medilabo.patientservice.dto.PatientRequest;
 import com.medilabo.patientservice.dto.PatientResponse;
+import com.medilabo.patientservice.exception.DuplicatePatientException;
 import com.medilabo.patientservice.exception.PatientNotFoundException;
 import com.medilabo.patientservice.mapper.PatientMapper;
 import com.medilabo.patientservice.model.Patient;
@@ -36,6 +37,17 @@ public class PatientService {
     }
 
     public PatientResponse create(PatientRequest request) {
+        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
+        if (phone != null && !phone.isEmpty()) {
+            String firstName = request.getFirstName().trim();
+            String lastName  = request.getLastName().trim();
+            patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
+                    firstName, lastName, request.getBirthDate(), phone)
+                .ifPresent(existing -> {
+                    log.warn("Duplicate patient creation attempt detected");
+                    throw new DuplicatePatientException();
+                });
+        }
         Patient patient = patientMapper.toEntity(request);
         PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
         log.info("Patient created with id {}", response.getId());

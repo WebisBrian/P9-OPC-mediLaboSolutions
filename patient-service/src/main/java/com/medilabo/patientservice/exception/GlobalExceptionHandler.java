@@ -26,6 +26,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
     }
 
+    @ExceptionHandler(DuplicatePatientException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicatePatient(DuplicatePatientException ex) {
+        log.warn("Duplicate patient: {}", ex.getMessage());
+        Map<String, Object> body = Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", HttpStatus.CONFLICT.value(),
+                "message", ex.getMessage()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = ex.getBindingResult().getFieldErrors().stream()
