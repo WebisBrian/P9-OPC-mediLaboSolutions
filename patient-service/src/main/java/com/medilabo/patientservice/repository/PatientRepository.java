@@ -10,4 +10,7 @@ public interface PatientRepository extends JpaRepository<Patient, Long> {
 
     Optional<Patient> findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhone(
             String firstName, String lastName, LocalDate birthDate, String phone);
+
+    Optional<Patient> findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+            String firstName, String lastName, LocalDate birthDate, String phone, Long id);
 }

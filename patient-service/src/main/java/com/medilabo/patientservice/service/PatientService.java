@@ -57,6 +57,17 @@ public class PatientService {
     public PatientResponse update(Long id, PatientRequest request) {
         Patient patient = patientRepository.findById(id)
                 .orElseThrow(() -> new PatientNotFoundException(id));
+        String phone = request.getPhone() != null ? request.getPhone().trim() : null;
+        if (phone != null && !phone.isEmpty()) {
+            String firstName = request.getFirstName().trim();
+            String lastName  = request.getLastName().trim();
+            patientRepository.findByFirstNameIgnoreCaseAndLastNameIgnoreCaseAndBirthDateAndPhoneAndIdNot(
+                    firstName, lastName, request.getBirthDate(), phone, id)
+                .ifPresent(existing -> {
+                    log.warn("Duplicate patient update attempt detected");
+                    throw new DuplicatePatientException();
+                });
+        }
         patientMapper.updateEntity(patient, request);
         PatientResponse response = patientMapper.toResponse(patientRepository.save(patient));
         log.info("Patient updated with id {}", id);
