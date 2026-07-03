@@ -3,6 +3,7 @@ package com.medilabo.patientservice.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.medilabo.patientservice.dto.PatientRequest;
 import com.medilabo.patientservice.dto.PatientResponse;
+import com.medilabo.patientservice.exception.DuplicatePatientException;
 import com.medilabo.patientservice.exception.PatientNotFoundException;
 import com.medilabo.patientservice.model.Gender;
 import com.medilabo.patientservice.service.PatientService;
@@ -299,6 +300,23 @@ class PatientControllerTest {
                 .andExpect(status().isCreated());
     }
 
+    // --- POST /patients — duplicate detection ---
+
+    @Test
+    void should_Return409WithStatus_When_CreatingDuplicatePatient() throws Exception {
+        // Arrange
+        when(patientService.create(any(PatientRequest.class)))
+                .thenThrow(new DuplicatePatientException());
+
+        // Act & Assert
+        mockMvc.perform(post("/patients")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(buildValidRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").exists());
+    }
+
     // --- PUT /patients/{id} ---
 
     @Test
@@ -331,6 +349,23 @@ class PatientControllerTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message", containsString("99")));
+    }
+
+    // --- PUT /patients/{id} — duplicate detection ---
+
+    @Test
+    void should_Return409WithStatus_When_UpdatingPatientCausesConflict() throws Exception {
+        // Arrange
+        when(patientService.update(eq(1L), any(PatientRequest.class)))
+                .thenThrow(new DuplicatePatientException());
+
+        // Act & Assert
+        mockMvc.perform(put("/patients/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(buildValidRequest())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message").exists());
     }
 
     // --- DELETE /patients/{id} ---
