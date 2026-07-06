@@ -25,7 +25,7 @@
         <tr th:each="patient : ${patients}">
             <td th:text="${patient.firstName()}"></td>
             <td th:text="${patient.lastName()}"></td>
-            <td th:text="${patient.birthDate()}"></td>
+            <td th:text="${#temporals.format(patient.birthDate(), 'dd/MM/yyyy')}"></td>
             <td th:text="${patient.gender()}"></td>
             <td th:text="${patient.address()}"></td>
             <td th:text="${patient.phone()}"></td>
