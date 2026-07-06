@@ -29,7 +29,16 @@ public class GatewaySecretFilter extends OncePerRequestFilter {
 
     private final byte[] expectedSecretBytes;
 
+    /**
+     * Fail-fast : un secret absent ou vide désactiverait silencieusement la protection de
+     * provenance (le filtre laisserait alors passer n'importe quelle requête). On refuse donc
+     * de démarrer patient-service plutôt que de tourner avec une sécurité de fait inactive.
+     */
     public GatewaySecretFilter(String expectedSecret) {
+        if (expectedSecret == null || expectedSecret.isBlank()) {
+            throw new IllegalStateException(
+                "gateway.secret manquant ou vide : refus de démarrer sans secret de provenance");
+        }
         this.expectedSecretBytes = expectedSecret.getBytes(StandardCharsets.UTF_8);
     }
 
