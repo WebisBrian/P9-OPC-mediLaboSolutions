@@ -20,6 +20,7 @@
         <module>patient-service</module>
         <module>gateway-service</module>
         <module>frontend-service</module>
+        <module>notes-service</module>
     </modules>
 
     <properties>
