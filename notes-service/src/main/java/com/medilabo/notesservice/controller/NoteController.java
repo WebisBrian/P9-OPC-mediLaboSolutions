@@ -4,12 +4,15 @@ import com.medilabo.notesservice.dto.NoteRequest;
 import com.medilabo.notesservice.dto.NoteResponse;
 import com.medilabo.notesservice.service.NoteService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
-import java.util.List;
 
 @RestController
 @RequestMapping("/notes")
@@ -22,8 +25,10 @@ public class NoteController {
     }
 
     @GetMapping
-    public ResponseEntity<List<NoteResponse>> findByPatientId(@RequestParam Long patientId) {
-        return ResponseEntity.ok(noteService.findByPatientId(patientId));
+    public ResponseEntity<Page<NoteResponse>> findByPatientId(
+            @RequestParam Long patientId,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(noteService.findByPatientId(patientId, pageable));
     }
 
     @PostMapping

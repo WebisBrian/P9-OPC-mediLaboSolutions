@@ -6,9 +6,9 @@ import com.medilabo.notesservice.mapper.NoteMapper;
 import com.medilabo.notesservice.model.Note;
 import com.medilabo.notesservice.repository.NoteRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Slf4j
 @Service
@@ -22,11 +22,10 @@ public class NoteService {
         this.noteMapper = noteMapper;
     }
 
-    // Liste vide = patient sans historique, cas normal (pas une erreur, pas de 404).
-    public List<NoteResponse> findByPatientId(Long patientId) {
-        return noteRepository.findByPatientId(patientId).stream()
-                .map(noteMapper::toResponse)
-                .toList();
+    // Page vide = patient sans historique, cas normal (pas une erreur, pas de 404).
+    public Page<NoteResponse> findByPatientId(Long patientId, Pageable pageable) {
+        return noteRepository.findByPatientId(patientId, pageable)
+                .map(noteMapper::toResponse);
     }
 
     public NoteResponse create(NoteRequest request) {

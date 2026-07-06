@@ -19,7 +19,8 @@ public class NoteMapper {
         return new NoteResponse(
                 note.getId(),
                 note.getPatientId(),
-                note.getNote()
+                note.getNote(),
+                note.getCreatedAt()
         );
     }
 }
