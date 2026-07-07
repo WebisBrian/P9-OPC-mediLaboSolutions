@@ -17,6 +17,7 @@
     <description>Monorepo MédiLabo Solutions — évaluation du risque diabète de type 2</description>
 
     <modules>
+        <module>assessment-service</module>
         <module>patient-service</module>
         <module>gateway-service</module>
         <module>frontend-service</module>
