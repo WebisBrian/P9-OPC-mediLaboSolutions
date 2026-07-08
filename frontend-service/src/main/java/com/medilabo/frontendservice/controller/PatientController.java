@@ -1,8 +1,10 @@
 package com.medilabo.frontendservice.controller;
 
+import com.medilabo.frontendservice.dto.AssessmentDto;
 import com.medilabo.frontendservice.dto.NoteForm;
 import com.medilabo.frontendservice.dto.PatientDto;
 import com.medilabo.frontendservice.dto.PatientForm;
+import com.medilabo.frontendservice.gateway.AssessmentGatewayClient;
 import com.medilabo.frontendservice.gateway.NoteGatewayClient;
 import com.medilabo.frontendservice.gateway.PatientGatewayClient;
 import jakarta.validation.Valid;
@@ -17,6 +19,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
@@ -28,10 +32,15 @@ public class PatientController {
 
     private final PatientGatewayClient patientGatewayClient;
     private final NoteGatewayClient noteGatewayClient;
+    private final AssessmentGatewayClient assessmentGatewayClient;
 
-    public PatientController(PatientGatewayClient patientGatewayClient, NoteGatewayClient noteGatewayClient) {
+    public PatientController(
+            PatientGatewayClient patientGatewayClient,
+            NoteGatewayClient noteGatewayClient,
+            AssessmentGatewayClient assessmentGatewayClient) {
         this.patientGatewayClient = patientGatewayClient;
         this.noteGatewayClient = noteGatewayClient;
+        this.assessmentGatewayClient = assessmentGatewayClient;
     }
 
     @GetMapping("/patients")
@@ -81,9 +90,7 @@ public class PatientController {
             Model model,
             RedirectAttributes redirectAttributes) {
         try {
-            PatientDto patient = patientGatewayClient.findById(id);
-            model.addAttribute("patient", patient);
-            model.addAttribute("notePage", noteGatewayClient.findByPatientId(id, page));
+            populateDetailModel(model, id, page);
             model.addAttribute("noteForm", new NoteForm());
             return "patients/detail";
         } catch (HttpClientErrorException.Unauthorized e) {
@@ -93,6 +100,33 @@ public class PatientController {
             log.warn("Patient introuvable via gateway : {}", e.getStatusCode());
             redirectAttributes.addFlashAttribute("errorMessage", "Patient introuvable.");
             return "redirect:/patients";
+        }
+    }
+
+    // Attributs communs à la page détail, communs aux deux chemins qui la rendent (showDetail et
+    // reloadDetailWithForm) : le noteForm reste hors de cette méthode, chaque appelant le pose
+    // différemment (vide vs saisie invalide conservée).
+    private void populateDetailModel(Model model, Long id, int page) {
+        PatientDto patient = patientGatewayClient.findById(id);
+        model.addAttribute("patient", patient);
+        model.addAttribute("notePage", noteGatewayClient.findByPatientId(id, page));
+        model.addAttribute("assessment", loadAssessment(id));
+    }
+
+    // L'évaluation du risque est un enrichissement de la page détail, pas son cœur : une panne
+    // d'assessment-service ne doit pas empêcher l'affichage du patient et de ses notes.
+    // Unauthorized reste propagé pour déclencher le redirect login comme les autres appels gateway.
+    private AssessmentDto loadAssessment(Long patientId) {
+        try {
+            return assessmentGatewayClient.findByPatientId(patientId);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw e;
+        } catch (RestClientResponseException e) {
+            log.warn("Évaluation du risque indisponible via gateway : {}", e.getStatusCode());
+            return null;
+        } catch (RestClientException e) {
+            log.warn("Évaluation du risque indisponible via gateway : service injoignable");
+            return null;
         }
     }
 
@@ -123,9 +157,7 @@ public class PatientController {
     // recharger patient + notePage pour que la vue reste complète, sans perdre la saisie invalide.
     private String reloadDetailWithForm(Long id, NoteForm noteForm, Model model, RedirectAttributes redirectAttributes) {
         try {
-            PatientDto patient = patientGatewayClient.findById(id);
-            model.addAttribute("patient", patient);
-            model.addAttribute("notePage", noteGatewayClient.findByPatientId(id, 0));
+            populateDetailModel(model, id, 0);
             model.addAttribute("noteForm", noteForm);
             return "patients/detail";
         } catch (HttpClientErrorException.Unauthorized e) {

@@ -5,71 +5,102 @@
 <nav th:replace="~{fragments/layout :: navbar}"></nav>
 <div class="container mb-5" style="max-width: 600px;">
     <h2 class="mb-4">Détail du patient</h2>
-    <dl class="row">
-        <dt class="col-sm-4">Prénom</dt>
-        <dd class="col-sm-8" th:text="${patient.firstName()}"></dd>
 
-        <dt class="col-sm-4">Nom</dt>
-        <dd class="col-sm-8" th:text="${patient.lastName()}"></dd>
+    <div class="card mb-4">
+        <div class="card-header">Informations patient</div>
+        <div class="card-body">
+            <dl class="row mb-3">
+                <dt class="col-sm-4">Prénom</dt>
+                <dd class="col-sm-8" th:text="${patient.firstName()}"></dd>
 
-        <dt class="col-sm-4">Date de naissance</dt>
-        <dd class="col-sm-8" th:text="${#temporals.format(patient.birthDate(), 'dd/MM/yyyy')}"></dd>
+                <dt class="col-sm-4">Nom</dt>
+                <dd class="col-sm-8" th:text="${patient.lastName()}"></dd>
 
-        <dt class="col-sm-4">Genre</dt>
-        <dd class="col-sm-8" th:text="${patient.gender()}"></dd>
+                <dt class="col-sm-4">Date de naissance</dt>
+                <dd class="col-sm-8" th:text="${#temporals.format(patient.birthDate(), 'dd/MM/yyyy')}"></dd>
 
-        <dt class="col-sm-4">Adresse</dt>
-        <dd class="col-sm-8" th:text="${patient.address()}"></dd>
+                <dt class="col-sm-4">Genre</dt>
+                <dd class="col-sm-8" th:text="${patient.gender()}"></dd>
 
-        <dt class="col-sm-4">Téléphone</dt>
-        <dd class="col-sm-8" th:text="${patient.phone()}"></dd>
-    </dl>
-    <a th:href="@{/patients/{id}/edit(id=${patient.id()})}" class="btn btn-warning me-2">Modifier</a>
-    <a th:href="@{/patients}" class="btn btn-secondary">Retour à la liste</a>
+                <dt class="col-sm-4">Adresse</dt>
+                <dd class="col-sm-8" th:text="${patient.address()}"></dd>
 
-    <h3 class="mt-5 mb-3">Historique des notes</h3>
-
-    <p class="text-muted" th:if="${#lists.isEmpty(notePage.content())}">Aucune note pour ce patient.</p>
-
-    <div th:unless="${#lists.isEmpty(notePage.content())}">
-        <div class="card mb-2" th:each="note : ${notePage.content()}">
-            <div class="card-body">
-                <p class="card-text" th:text="${note.note()}"></p>
-                <p class="card-subtitle text-muted small mb-0" th:text="${#temporals.format(note.createdAt(), 'dd/MM/yyyy HH:mm')}"></p>
-            </div>
+                <dt class="col-sm-4">Téléphone</dt>
+                <dd class="col-sm-8" th:text="${patient.phone()}"></dd>
+            </dl>
+            <a th:href="@{/patients/{id}/edit(id=${patient.id()})}" class="btn btn-warning me-2">Modifier</a>
+            <a th:href="@{/patients}" class="btn btn-secondary">Retour à la liste</a>
         </div>
-
-        <nav th:if="${notePage.totalPages() > 1}" aria-label="Pagination des notes">
-            <ul class="pagination">
-                <li class="page-item" th:classappend="${notePage.first()} ? 'disabled'">
-                    <a class="page-link"
-                       th:href="${notePage.first()} ? '#' : @{/patients/{id}(id=${patient.id()}, page=${notePage.number() - 1})}">Précédent</a>
-                </li>
-                <li class="page-item disabled">
-                    <span class="page-link" th:text="'Page ' + ${notePage.number() + 1} + ' / ' + ${notePage.totalPages()}"></span>
-                </li>
-                <li class="page-item" th:classappend="${notePage.last()} ? 'disabled'">
-                    <a class="page-link"
-                       th:href="${notePage.last()} ? '#' : @{/patients/{id}(id=${patient.id()}, page=${notePage.number() + 1})}">Suivant</a>
-                </li>
-            </ul>
-        </nav>
     </div>
 
-    <h3 class="mt-4 mb-3">Ajouter une note</h3>
+    <div class="card mb-4">
+        <div class="card-header">Évaluation du risque de diabète</div>
+        <div class="card-body">
+            <p class="text-muted mb-0" th:if="${assessment == null}">Évaluation indisponible.</p>
 
-    <div class="alert alert-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+            <div th:if="${assessment != null}">
+                <span class="badge fs-6 bg-secondary" th:if="${assessment.riskLevel() == 'None'}" th:text="${assessment.riskLevel()}"></span>
+                <span class="badge fs-6 bg-warning text-dark" th:if="${assessment.riskLevel() == 'Borderline'}" th:text="${assessment.riskLevel()}"></span>
+                <span class="badge fs-6 text-white" style="background-color:#fd7e14;" th:if="${assessment.riskLevel() == 'In Danger'}" th:text="${assessment.riskLevel()}"></span>
+                <span class="badge fs-6 bg-danger" th:if="${assessment.riskLevel() == 'Early onset'}" th:text="${assessment.riskLevel()}"></span>
 
-    <form th:action="@{/patients/{id}/notes(id=${patient.id()})}" method="post" th:object="${noteForm}">
-        <div class="mb-3">
-            <label for="note" class="form-label">Note</label>
-            <textarea id="note" class="form-control" rows="3"
-                      th:field="*{note}"
-                      th:classappend="${#fields.hasErrors('note')} ? 'is-invalid'"></textarea>
-            <div class="invalid-feedback" th:if="${#fields.hasErrors('note')}" th:errors="*{note}"></div>
+                <p class="text-muted mt-2 mb-0" th:if="${#lists.isEmpty(assessment.triggers())}">Aucun déclencheur détecté.</p>
+                <div class="mt-2" th:unless="${#lists.isEmpty(assessment.triggers())}">
+                    <span class="badge bg-light text-dark border me-1" th:each="trigger : ${assessment.triggers()}" th:text="${trigger}"></span>
+                </div>
+            </div>
         </div>
-        <button type="submit" class="btn btn-primary">Ajouter la note</button>
-    </form>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Historique des notes</div>
+        <div class="card-body">
+            <p class="text-muted mb-0" th:if="${#lists.isEmpty(notePage.content())}">Aucune note pour ce patient.</p>
+
+            <div th:unless="${#lists.isEmpty(notePage.content())}">
+                <div class="card mb-2" th:each="note : ${notePage.content()}">
+                    <div class="card-body">
+                        <p class="card-text" th:text="${note.note()}"></p>
+                        <p class="card-subtitle text-muted small mb-0" th:text="${#temporals.format(note.createdAt(), 'dd/MM/yyyy HH:mm')}"></p>
+                    </div>
+                </div>
+
+                <nav th:if="${notePage.totalPages() > 1}" aria-label="Pagination des notes">
+                    <ul class="pagination mb-0">
+                        <li class="page-item" th:classappend="${notePage.first()} ? 'disabled'">
+                            <a class="page-link"
+                               th:href="${notePage.first()} ? '#' : @{/patients/{id}(id=${patient.id()}, page=${notePage.number() - 1})}">Précédent</a>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link" th:text="'Page ' + ${notePage.number() + 1} + ' / ' + ${notePage.totalPages()}"></span>
+                        </li>
+                        <li class="page-item" th:classappend="${notePage.last()} ? 'disabled'">
+                            <a class="page-link"
+                               th:href="${notePage.last()} ? '#' : @{/patients/{id}(id=${patient.id()}, page=${notePage.number() + 1})}">Suivant</a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Ajouter une note</div>
+        <div class="card-body">
+            <div class="alert alert-danger" th:if="${errorMessage}" th:text="${errorMessage}"></div>
+
+            <form th:action="@{/patients/{id}/notes(id=${patient.id()})}" method="post" th:object="${noteForm}">
+                <div class="mb-3">
+                    <label for="note" class="form-label">Note</label>
+                    <textarea id="note" class="form-control" rows="3"
+                              th:field="*{note}"
+                              th:classappend="${#fields.hasErrors('note')} ? 'is-invalid'"></textarea>
+                    <div class="invalid-feedback" th:if="${#fields.hasErrors('note')}" th:errors="*{note}"></div>
+                </div>
+                <button type="submit" class="btn btn-primary">Ajouter la note</button>
+            </form>
+        </div>
+    </div>
 </div>
 </body>
 </html>

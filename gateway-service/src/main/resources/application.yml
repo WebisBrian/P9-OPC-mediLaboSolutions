@@ -18,6 +18,12 @@ spring:
                 - Path=/notes/**
               filters:
                 - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
+            - id: assessment-service
+              uri: http://localhost:8084
+              predicates:
+                - Path=/assessment/**
+              filters:
+                - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
 
 server:
   port: 8080
