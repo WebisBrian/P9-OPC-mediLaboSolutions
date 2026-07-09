@@ -38,3 +38,5 @@ build/
 **/.env.*
 # Mais garde les templates .env.example suivis (à tout niveau)
 !**/.env.example
+# Clés RS256 (JWT) générées localement par scripts/generate-keys.sh
+**/src/main/resources/keys/*.pem
