@@ -51,7 +51,7 @@ model/        → entités (JPA pour patient, documents pour notes)
 dto/          → objets exposés par l'API
 mapper/       → mapping entité ↔ DTO (composant @Component injecté, pas statique)
 exception/    → exceptions métier nommées + @RestControllerAdvice
-security/     → configuration Spring (SecurityConfig, GatewaySecretFilter de provenance)
+security/     → configuration Spring (SecurityConfig, resource-server JWT)
 ```
 
 ### Conventions
@@ -70,7 +70,7 @@ security/     → configuration Spring (SecurityConfig, GatewaySecretFilter de p
 Microservice indépendant, jamais incorporé au back. Spring MVC + Thymeleaf (server-side), pas de SPA.
 - **Pas de Spring Security sur le front.** Login maison léger : page de login, credentials utilisateur stockés en `HttpSession`, rejoués en HTTP Basic vers la gateway. Un `HandlerInterceptor` protège les routes (redirect `/login` si pas de session).
 - **RestClient** (pas WebClient, réactif inutile en MVC servlet ; pas RestTemplate).
-- **Un client par microservice back** : `PatientGatewayClient` (et `NoteGatewayClient` au S2, etc.). Un seul composant par domaine dialogue avec la gateway ; les controllers orchestrent. Mutualiser la mécanique d'auth (lecture session + header Basic) **quand le 2e client apparaît** (S2), pas avant (YAGNI).
+- **Un client par microservice back** : `PatientGatewayClient`, `NoteGatewayClient`, `AssessmentGatewayClient`. Un seul composant par domaine dialogue avec la gateway ; les controllers orchestrent. Décision effective (S2) : **pas de mutualisation** de la mécanique d'auth (lecture session + header Basic) entre clients — chaque client réplique la mécanique, YAGNI tant que la duplication reste minime. Le front est inchangé par la migration JWT du S4 : il parle toujours Basic à la gateway, ne voit jamais de token.
 - **Séparation lecture/écriture** : DTO record immuable pour la lecture (désérialisation GET), classe Form mutable + Bean Validation pour les formulaires. Mapping manuel (pas de mapper framework côté front).
 - **Traduction verbes HTTP** : les formulaires HTML ne font que GET/POST ; le front expose `POST /x/{id}` (update) et `POST /x/{id}/delete`, le client traduit vers PUT/DELETE côté gateway.
 - **Pas de duplication d'un type interne du back** (ex. enum `Gender`) : manipuler des String côté front pour éviter le couplage.
@@ -96,29 +96,34 @@ SOLID = boussole, pas dogme. Chaque abstraction doit se justifier par un besoin 
 - Approche pragmatique : **code puis tests** sur le CRUD classique (logique triviale). **TDD réservé à l'algorithme d'assessment (S3)**, où les règles précises et les cas-frontière justifient d'écrire les tests d'abord.
 - Nommage explicite : `should_<expected>_when_<condition>`.
 - Distinguer **unit** (logique métier : services, mappers, surtout l'algorithme d'assessment ; repository mocké) et **integration/web** (endpoints via `@WebMvcTest`, service mocké).
-- Tests sur **H2 en mémoire** (scope test), prod/dev sur PostgreSQL. Config de test séparée (`src/test/resources/application.properties`) ; désactiver l'init SQL en test (`spring.sql.init.mode=never`) pour éviter les conflits de dialecte (ex. `ON CONFLICT` Postgres ≠ H2).
+- Tests d'intégration BDD sur **Testcontainers** (abandon de H2 dès le S2) : `postgres:16` pour patient-service, `mongo:7` pour notes-service. Pattern : conteneur `static` + `@Container` + `@ServiceConnection`, pas de config de datasource manuelle. Ces tests exigent Docker actif localement et en CI ; les tests unitaires (service, mapper, algorithme d'assessment) n'en dépendent pas.
 - Un seul `spring-boot-starter-test` couvre JUnit 5, Mockito, AssertJ, MockMvc. Ne pas inventer de starters de test par dépendance.
 - Prioriser ce qui protège réellement contre la régression, pas la couverture exhaustive.
 
-Les services back portant le GatewaySecretFilter doivent fournir gateway.secret aux tests qui chargent le contexte (@TestPropertySource ou config de test), sinon le fail-fast empêche le démarrage. Isoler les tests @WebMvcTest de la sécurité via excludeAutoConfiguration.
+Les services back qui chargent le contexte Spring complet (`@SpringBootTest`) doivent pointer `jwt.public-key-path` vers la clé publique de TEST (`@TestPropertySource(properties = "jwt.public-key-path=classpath:keys/test_public_key.pem")`) : la clé de prod est gitignorée donc absente en CI, et le `JwtDecoder` est fail-fast à l'absence de clé. Les `@WebMvcTest` de controller continuent d'EXCLURE la sécurité (`excludeAutoConfiguration = {SecurityAutoConfiguration.class, SecurityFilterAutoConfiguration.class}`) : ils testent le mapping/JSON/statuts métier, pas l'authentification. Un `SecurityConfigTest` dédié par back (sans cette exclusion, `@Import(SecurityConfig.class)`) prouve le contrat de sécurité : sans token → 401, JWT valide → 200, mauvaise signature → 401, mauvais issuer → 401, expiré → 401.
 
 ---
 
 ## Sécurité
 
-Trois segments, trois mécanismes (décision définitive, validée mentor) :
+Trois segments, trois mécanismes (modèle révisé au S4 — le secret partagé initial a été remplacé par un JWT signé) :
 
 | Segment | Mécanisme |
 |---|---|
-| navigateur ↔ frontend | Session serveur (`JSESSIONID`) |
-| frontend ↔ gateway | HTTP Basic (creds utilisateur rejoués depuis la session) |
-| gateway ↔ services back | Secret partagé (header `X-Gateway-Secret`) |
+| navigateur ↔ frontend | Session serveur (`JSESSIONID`) — inchangé |
+| frontend ↔ gateway | HTTP Basic (creds utilisateur rejoués depuis la session) — inchangé |
+| gateway ↔ services back | **JWT RS256 signé** (header `Authorization: Bearer`) |
 
-- **Auth utilisateur centralisée à la gateway** : HTTP Basic, utilisateurs in-memory, mots de passe BCrypt (obligatoire). Pas d'inscription, pas de rôles. Gateway = WebFlux réactif → `SecurityWebFilterChain` + `ServerHttpSecurity` en bean (PAS `SecurityFilterChain`/`HttpSecurity`, qui sont l'API servlet réservée aux backs ; PAS de `WebSecurityConfigurerAdapter` déprécié).
+- **Auth utilisateur centralisée à la gateway** : HTTP Basic, utilisateurs in-memory, mots de passe BCrypt (obligatoire). Pas d'inscription, pas de rôles. Gateway = WebFlux réactif → `SecurityWebFilterChain` + `ServerHttpSecurity` en bean (PAS `SecurityFilterChain`/`HttpSecurity`, qui sont l'API servlet réservée aux backs ; PAS de `WebSecurityConfigurerAdapter` déprécié). Cette couche est inchangée par la migration S4.
 - **Stack de sécurité selon le module** : gateway = réactive (`SecurityWebFilterChain` + `ServerHttpSecurity`) car WebFlux ; services back = servlet (`SecurityFilterChain` + `HttpSecurity`) car MVC/Tomcat. Ne jamais copier le pattern d'un module vers l'autre sans adapter la stack.
-- **Provenance des requêtes (chaque service back)** : un `GatewaySecretFilter` (`OncePerRequestFilter`) valide le header `X-Gateway-Secret` (comparaison constant-time, fail-fast si le secret est absent au démarrage). Absent/faux → 403. La gateway injecte le secret via `AddRequestHeader` sur la route du service. **Tout nouveau service back (ex. notes-service au S2) doit porter ce filtre + sa route gateway doit ajouter le header.**
-- Principe : *centralisé ≠ exclusif*. Le back ne ré-authentifie pas l'utilisateur ; il vérifie seulement qu'une requête vient bien de la gateway. Défense en profondeur = secret + isolation réseau Docker (S5).
-- **Secrets** : aucun secret en dur. Credentials (auth gateway, DB Postgres/Mongo, `X-Gateway-Secret`) via variables d'env / `.env` (gitignore, `.env.example` versionné). Docker Compose lit ces variables.
+- **Émission du JWT (gateway)** : après authentification Basic réussie, un `JwtIssuer` forge un JWT signé RS256 avec la clé PRIVÉE de la gateway. Claims strictement `sub` (username), `iss` (`medilabo-gateway`), `iat`, `exp` — pas de rôles/scopes. Expiration courte (60s, configurable) : le token ne vit que le temps d'un hop interne gateway→back. Un `JwtRelayGlobalFilter` (`GlobalFilter` Spring Cloud Gateway, contexte réactif via `ReactiveSecurityContextHolder`) l'injecte sur chaque requête sortante et ÉCRASE l'`Authorization: Basic` entrant — les credentials utilisateur ne franchissent jamais la gateway vers les backs.
+- **Validation du JWT (chaque service back)** : `spring-boot-starter-oauth2-resource-server` (resource-server standard Spring Security, PAS de filtre de validation maison — la validation JWT artisanale introduit des failles classiques : `alg:none`, confusion RS256/HS256, expiration non vérifiée). `SecurityConfig` : STATELESS + `anyRequest().authenticated()` (remplace l'ancien `permitAll()`) + bean `JwtDecoder` (`NimbusJwtDecoder.withPublicKey(...)` + `setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer))`, qui valide signature RS256, expiration ET issuer). Fail-fast si la clé publique est absente/illisible au démarrage. Requête sans token valide → **401** (et non plus 403).
+- **Propriété centrale** : seule la gateway détient la clé privée RS256. Aucun back ne peut forger de token — le JWT porte à la fois l'identité (`sub`) et la provenance (signature vérifiable avec la clé publique) en un seul mécanisme cryptographique.
+- **Cas assessment-service (double rôle)** : c'est le seul back qui est à la fois serveur (valide le JWT entrant comme les autres) ET client (appelle patient/notes en direct). Il ne forge JAMAIS de token : il RELAIE tel quel celui qu'il a reçu, via `RelayedJwtProvider.currentTokenValue()` → `jwt.getTokenValue()`, lu dans le `SecurityContextHolder` **synchrone** (assessment est servlet, pas réactif — ne pas confondre avec `ReactiveSecurityContextHolder` côté gateway). L'identité de l'utilisateur d'origine traverse ainsi toute la chaîne d'agrégation jusqu'à patient et notes.
+- **Clés RS256** : paire générée par `scripts/generate-keys.sh` (clé privée PKCS#8 PEM pour la gateway, clé publique X.509/SPKI PEM dupliquée dans chaque back). Clés de PROD non versionnées (`.gitignore` : `**/src/main/resources/keys/*.pem`). Clés de TEST jetables, committées dans `src/test/resources/keys/` de chaque service (nécessaires pour que les tests `@SpringBootTest` passent en CI sans la clé de prod).
+- **Consigne pour tout nouveau service back** : porter la même `SecurityConfig` (resource-server JWT, pas de filtre maison) et recevoir la clé publique via `scripts/generate-keys.sh`. Cette consigne **remplace** l'ancienne exigence de porter un `GatewaySecretFilter`.
+- Principe : *centralisé ≠ exclusif*. Le back ne ré-authentifie pas l'utilisateur ; il vérifie seulement la validité et la provenance du JWT émis par la gateway. Défense en profondeur = JWT + isolation réseau Docker (S5).
+- **Secrets** : aucun secret en dur. Credentials (auth gateway HTTP Basic, DB Postgres/Mongo) via variables d'env / `.env` (gitignore, `.env.example` versionné). Docker Compose lit ces variables. Les CHEMINS de clés (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) ne sont PAS des secrets : ils ont un défaut (`classpath:keys/...`) directement dans les `.properties`/`.yml` de chaque service et n'ont pas besoin de figurer dans `.env`.
 - Le **front n'a pas de `.env`** : pas de compte de service, les credentials viennent de l'utilisateur via une page de login (login maison léger, pas de Spring Security sur le front — voir conventions front).
 
 ### Validation (multi-couches, règle du projet)
@@ -173,12 +178,21 @@ Toute feature documentée dans `docs/features/<feature>.md` : résumé, endpoint
 
 ## Découpage par sprints
 
-Patient (S1) → Notes (S2) → Assessment (S3), puis Docker et Green Code. Chaque service back est généré **au moment de son sprint**. Ne pas scaffolder de service non encore abordé.
+Patient (S1) → Notes (S2) → Assessment (S3) → Sécurité JWT (S4) → Docker (S5) → Green Code (S6). Chaque service back est généré **au moment de son sprint**. Ne pas scaffolder de service non encore abordé.
+
+Ports : gateway 8080, patient 8081, frontend 8082, notes 8083, assessment 8084.
 
 ### État d'avancement
 - **S1 — TERMINÉ** (patient-service, gateway-service, frontend-service).
-    - patient-service : CRUD `/patients`, validation durcie (format/longueur), dédup patient (409), `GlobalExceptionHandler` (404/409/400), `GatewaySecretFilter` (provenance), seeding 4 patients OPC, tests verts. SB 3.5.x.
-    - gateway-service : Spring Cloud Gateway, route `/patients/**`, auth Basic centralisée (BCrypt, in-memory), injection `X-Gateway-Secret` vers le back.
+    - patient-service : CRUD `/patients`, validation durcie (format/longueur), dédup patient (409), `GlobalExceptionHandler` (404/409/400), seeding 4 patients OPC, tests verts. SB 3.5.x.
+    - gateway-service : Spring Cloud Gateway, route `/patients/**`, auth Basic centralisée (BCrypt, in-memory).
     - frontend-service : UI Thymeleaf sobre, login maison, `PatientGatewayClient`, CRUD complet, validation alignée + gestion 409.
-    - Détail complet : `docs/SPRINT1.md` (si généré) ou rapport de fin de sprint.
-- **S2 — à démarrer** : notes-service (MongoDB) + `NoteGatewayClient` au front + route gateway avec secret. notes-service doit reproduire le `GatewaySecretFilter`.
+    - Détail complet : `docs/features/SPRINT1.md`.
+- **S2 — TERMINÉ** : notes-service (MongoDB, port 8083), route gateway `/notes/**`, `NoteGatewayClient` au front, affichage des notes sur la page détail patient (historique paginé + formulaire d'ajout). Migration des tests d'intégration BDD de H2 vers Testcontainers (patient inclus, rétroactivement).
+    - Détail complet : `docs/features/SPRINT2.md`.
+- **S3 — TERMINÉ** : assessment-service (port 8084, sans BDD, interroge patient + notes en direct), calcul du risque diabète (`RiskCalculator` + `TriggerDetector`, TDD), route gateway `/assessment/**`, `AssessmentGatewayClient` au front, affichage du niveau de risque + déclencheurs sur la page détail patient.
+    - Détail complet : `docs/features/SPRINT3.md`.
+- **S4 — TERMINÉ** (itération sécurité, hors périmètre OPC) : migration du secret partagé `X-Gateway-Secret` vers un JWT RS256 signé. Émission côté gateway (`JwtIssuer` + `JwtRelayGlobalFilter`), validation via resource-server standard sur les trois backs (patient, notes, assessment), relay (sans forge) du token par assessment vers patient/notes via `RelayedJwtProvider`. `GatewaySecretFilter` supprimé partout. Voir section Sécurité ci-dessus pour le détail du mécanisme.
+    - Détail complet : `docs/features/SPRINT4.md` (à générer).
+- **S5 — à démarrer** : dockerisation (un `Dockerfile` par service + `docker-compose.yml` global à la racine). Point de vigilance : les base-urls d'assessment vers patient/notes (`patient-service.base-url`, `notes-service.base-url`, aujourd'hui `http://localhost:8081`/`8083`) devront pointer vers les noms de services Docker Compose plutôt que `localhost`. Ajouter Spring Boot Actuator uniformément (healthchecks compose).
+- **S6 — à démarrer** : section Green Code du README (analyse + pistes de refactoring).
