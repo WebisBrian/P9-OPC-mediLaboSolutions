@@ -2,8 +2,10 @@ package com.medilabo.assessmentservice.client;
 
 import com.medilabo.assessmentservice.dto.PatientResponse;
 import com.medilabo.assessmentservice.exception.PatientNotFoundException;
+import com.medilabo.assessmentservice.security.RelayedJwtProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -13,24 +15,19 @@ import org.springframework.web.client.RestClientResponseException;
 @Component
 public class PatientClient {
 
-    private static final String GATEWAY_SECRET_HEADER = "X-Gateway-Secret";
-
     private final RestClient restClient;
-    private final String gatewaySecret;
 
     public PatientClient(
             @Value("${patient-service.base-url}") String baseUrl,
-            @Value("${gateway.secret}") String gatewaySecret,
             RestClient.Builder restClientBuilder) {
         this.restClient = restClientBuilder.baseUrl(baseUrl).build();
-        this.gatewaySecret = gatewaySecret;
     }
 
     public PatientResponse findById(Long patientId) {
         try {
             return restClient.get()
                     .uri("/patients/{id}", patientId)
-                    .header(GATEWAY_SECRET_HEADER, gatewaySecret)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + RelayedJwtProvider.currentTokenValue())
                     .retrieve()
                     .body(PatientResponse.class);
         } catch (HttpClientErrorException.NotFound ex) {

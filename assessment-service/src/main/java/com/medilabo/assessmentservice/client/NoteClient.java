@@ -2,8 +2,10 @@ package com.medilabo.assessmentservice.client;
 
 import com.medilabo.assessmentservice.dto.NotePage;
 import com.medilabo.assessmentservice.dto.NoteResponse;
+import com.medilabo.assessmentservice.security.RelayedJwtProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -15,18 +17,14 @@ import java.util.List;
 @Component
 public class NoteClient {
 
-    private static final String GATEWAY_SECRET_HEADER = "X-Gateway-Secret";
     private static final int PAGE_SIZE = 50;
 
     private final RestClient restClient;
-    private final String gatewaySecret;
 
     public NoteClient(
             @Value("${notes-service.base-url}") String baseUrl,
-            @Value("${gateway.secret}") String gatewaySecret,
             RestClient.Builder restClientBuilder) {
         this.restClient = restClientBuilder.baseUrl(baseUrl).build();
-        this.gatewaySecret = gatewaySecret;
     }
 
     /**
@@ -49,7 +47,7 @@ public class NoteClient {
         try {
             return restClient.get()
                     .uri("/notes?patientId={patientId}&page={page}&size={size}", patientId, page, PAGE_SIZE)
-                    .header(GATEWAY_SECRET_HEADER, gatewaySecret)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + RelayedJwtProvider.currentTokenValue())
                     .retrieve()
                     .body(NotePage.class);
         } catch (RestClientResponseException ex) {
