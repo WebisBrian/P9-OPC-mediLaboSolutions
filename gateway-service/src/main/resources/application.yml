@@ -10,20 +10,21 @@ spring:
               uri: http://localhost:8081
               predicates:
                 - Path=/patients/**
-              filters:
-                - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
             - id: notes-service
               uri: http://localhost:8083
               predicates:
                 - Path=/notes/**
-              filters:
-                - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
             - id: assessment-service
               uri: http://localhost:8084
               predicates:
                 - Path=/assessment/**
-              filters:
-                - AddRequestHeader=X-Gateway-Secret,${GATEWAY_SECRET}
 
 server:
   port: 8080
+
+# JWT RS256 émis par la gateway (JwtIssuer) et injecté en Authorization: Bearer
+# vers les backs, en remplacement de l'ancien AddRequestHeader X-Gateway-Secret.
+jwt:
+  issuer: medilabo-gateway
+  expiration-seconds: 60
+  private-key-path: ${JWT_PRIVATE_KEY_PATH:classpath:keys/private_key.pem}
