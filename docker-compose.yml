@@ -1,0 +1,153 @@
+services:
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-medilabo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-medilabo}
+      POSTGRES_DB: ${DB_NAME:-medilabo_patient}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - medilabo-net
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand('ping')\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - medilabo-net
+
+  patient-service:
+    build:
+      context: .
+      dockerfile: patient-service/Dockerfile
+    image: medilabo/patient-service
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-medilabo_patient}
+      DB_USERNAME: ${DB_USERNAME:-medilabo}
+      DB_PASSWORD: ${DB_PASSWORD:-medilabo}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8081/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medilabo-net
+
+  notes-service:
+    build:
+      context: .
+      dockerfile: notes-service/Dockerfile
+    image: medilabo/notes-service
+    environment:
+      MONGO_HOST: mongo
+      MONGO_PORT: 27017
+      MONGO_DB: ${MONGO_DB:-medilabo_notes}
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8083/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medilabo-net
+
+  assessment-service:
+    build:
+      context: .
+      dockerfile: assessment-service/Dockerfile
+    image: medilabo/assessment-service
+    environment:
+      PATIENT_SERVICE_URL: http://patient-service:8081
+      NOTES_SERVICE_URL: http://notes-service:8083
+    depends_on:
+      patient-service:
+        condition: service_healthy
+      notes-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8084/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medilabo-net
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: gateway-service/Dockerfile
+    image: medilabo/gateway-service
+    environment:
+      SECURITY_USERNAME: ${SECURITY_USERNAME:-admin}
+      SECURITY_PASSWORD: ${SECURITY_PASSWORD:-medilabo}
+      PATIENT_SERVICE_URL: http://patient-service:8081
+      NOTES_SERVICE_URL: http://notes-service:8083
+      ASSESSMENT_SERVICE_URL: http://assessment-service:8084
+    depends_on:
+      patient-service:
+        condition: service_healthy
+      notes-service:
+        condition: service_healthy
+      assessment-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medilabo-net
+
+  frontend-service:
+    build:
+      context: .
+      dockerfile: frontend-service/Dockerfile
+    image: medilabo/frontend-service
+    environment:
+      GATEWAY_BASE_URL: http://gateway-service:8080
+    depends_on:
+      gateway-service:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8082/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medilabo-net
+
+networks:
+  medilabo-net:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  mongo-data:
