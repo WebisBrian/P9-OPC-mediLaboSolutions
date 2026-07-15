@@ -4,27 +4,59 @@ Application d'aide au dépistage du risque de diabète de type 2, développée p
 
 Voir `CLAUDE.md` pour le cadrage complet (stack, conventions, sécurité, découpage par sprints) et `docs/features/` pour la documentation détaillée de chaque fonctionnalité.
 
-## Clés RS256 (sécurité JWT)
+## Lancement de l'application
 
-La gateway authentifie les utilisateurs (HTTP Basic) puis émet un JWT signé en **RS256** pour chaque requête relayée vers les services back. Ce JWT est validé par chaque back avant de traiter la requête.
-
-- **Pourquoi RS256 (asymétrique) plutôt qu'un secret partagé symétrique** : la gateway signe avec la clé **privée**, les services back valident avec la clé **publique** correspondante. Un service back ne détient jamais la clé privée : il ne peut donc jamais forger un token, seulement en vérifier l'authenticité. Cela réduit la surface d'attaque en cas de compromission d'un back.
-- **Pourquoi les clés ne sont pas versionnées** : une clé privée ne se commit jamais dans un dépôt Git, même en contexte de démonstration. Chaque environnement (poste de développement, CI, prod) génère ou reçoit sa propre paire de clés.
-
-### Procédure de montage (développement local)
+Prérequis unique : **Docker Desktop**. Ni Java, ni Maven, ni PostgreSQL, ni MongoDB à installer — tout tourne en conteneurs.
 
 ```bash
 ./scripts/generate-keys.sh
+docker compose up --build
 ```
 
-Génère une paire de clés RSA 2048 bits :
-- clé privée (PKCS#8 PEM) → `gateway-service/src/main/resources/keys/private_key.pem`
-- clé publique (X.509/SPKI PEM), dupliquée dans chaque back → `<service>/src/main/resources/keys/public_key.pem`
+Puis ouvrir **http://localhost:8082** et se connecter avec :
 
-Si des clés existent déjà, le script demande confirmation avant de les écraser (ou utiliser `--force` pour écraser sans confirmation).
+- **Identifiant** : `admin`
+- **Mot de passe** : `medilabo`
 
-Lancer ensuite les services normalement (`./run-dev.sh <service>`).
+### Pourquoi `generate-keys.sh` d'abord
 
-### Note production
+La sécurité interne (gateway → services back) repose sur un JWT signé en **RS256**. La clé privée de signature ne se commit jamais dans un dépôt Git, même en contexte de démonstration — chaque environnement doit générer la sienne. Cette commande génère localement la paire de clés (non versionnée, ignorée par Git) et la place aux emplacements attendus par la gateway et les 3 services back ; le build Docker les embarque ensuite dans les images. Sans cette étape, les conteneurs refusent de démarrer (fail-fast, clé absente).
 
-En production, la clé privée serait fournie via un gestionnaire de secrets (ex. Vault, secret manager cloud), jamais présente sur le filesystem du dépôt ni de l'image Docker.
+### Premier `up --build` : compter 5 à 10 minutes
+
+Chaque service se construit dans son propre conteneur (build Maven multi-stage inclus) : la première exécution télécharge les dépendances Maven et les images de base pour les 5 modules, ce qui prend plusieurs minutes selon la connexion. Ce n'est **pas un blocage** — les lancements suivants réutilisent le cache Docker et sont nettement plus rapides. `docker compose logs -f` permet de suivre la progression si besoin.
+
+### `.env` (optionnel)
+
+Le compose fournit des identifiants de démonstration fonctionnels par défaut (voir `.env.example`) : `docker compose up --build` fonctionne **sans créer de `.env`**. Pour personnaliser les credentials (PostgreSQL, MongoDB, authentification gateway), copier `.env.example` en `.env` à la racine (fichier gitignoré) et modifier les valeurs souhaitées.
+
+## Vérification rapide
+
+Le seeding au démarrage crée 4 patients de test, chacun conçu pour illustrer un niveau de risque distinct de l'algorithme d'évaluation :
+
+| Patient | Âge / genre | Déclencheurs détectés | Niveau attendu |
+|---|---|---|---|
+| TestNone | ≥ 30 ans, F | Poids (1) | **None** |
+| TestBorderline | ≥ 30 ans, M | Anormal, Réaction (2) | **Borderline** |
+| TestInDanger | < 30 ans, M | Fumeur, Anormal, Cholestérol (3) | **In Danger** |
+| TestEarlyOnset | < 30 ans, F | Hémoglobine A1C, Taille, Poids, Fumeur, Cholestérol, Vertiges, Réaction, Anticorps (8) | **Early onset** |
+
+Détail des règles de calcul : `docs/features/SPRINT3.md`.
+
+**Parcours de vérification** : se connecter → la liste affiche les 4 patients → cliquer sur un patient → la page détail affiche ses informations, l'historique paginé de ses notes, et un badge d'évaluation du risque (avec la liste des déclencheurs détectés) cohérent avec le tableau ci-dessus.
+
+## Architecture
+
+| Service | Port | Rôle | Base de données |
+|---|---|---|---|
+| `gateway-service` | 8080 | Point d'entrée unique, authentification HTTP Basic, émission du JWT interne | — |
+| `patient-service` | 8081 | Données démographiques patient (CRUD) | PostgreSQL |
+| `frontend-service` | 8082 | Interface utilisateur (Thymeleaf), login maison | — |
+| `notes-service` | 8083 | Notes médecin (non structurées) | MongoDB |
+| `assessment-service` | 8084 | Calcul du risque diabète (interroge patient + notes en direct) | — |
+
+**Seul le port 8082 est publié sur l'hôte.** La gateway est le point d'entrée unique du système ; elle-même, les 3 services back et les bases de données ne sont joignables que sur le réseau Docker interne (`medilabo-net`), jamais depuis l'extérieur — le réseau matérialise cette contrainte, pas seulement la convention applicative.
+
+## Lancement en local sans Docker (optionnel)
+
+Pour déboguer un service depuis l'IDE : chaque module reste lançable individuellement (`./run-dev.sh <service>` ou exécution directe depuis l'IDE), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`) ; credentials par service via un `.env` local à chaque module (voir `<service>/.env.example`). Détail des conventions : `CLAUDE.md`.
