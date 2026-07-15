@@ -28,3 +28,9 @@ jwt:
   issuer: medilabo-gateway
   expiration-seconds: 60
   private-key-path: ${JWT_PRIVATE_KEY_PATH:classpath:keys/private_key.pem}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

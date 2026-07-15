@@ -7,6 +7,13 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.autoconfigure.endpoint.EndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.endpoint.web.WebEndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.health.HealthContributorAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.health.HealthEndpointAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.web.server.ManagementContextAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.web.servlet.ServletManagementContextAutoConfiguration;
+import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
@@ -49,6 +56,12 @@ import static org.mockito.Mockito.when;
  */
 @WebMvcTest(NoteController.class)
 @Import(SecurityConfig.class)
+// @WebMvcTest ne charge pas les endpoints Actuator par défaut : ces classes reproduisent
+// le câblage minimal (endpoint + exposition web + health + rattachement au port principal)
+// nécessaire pour exercer /actuator/health à travers la vraie SecurityConfig.
+@ImportAutoConfiguration({EndpointAutoConfiguration.class, WebEndpointAutoConfiguration.class,
+        HealthEndpointAutoConfiguration.class, HealthContributorAutoConfiguration.class,
+        ServletManagementContextAutoConfiguration.class, ManagementContextAutoConfiguration.class})
 @TestPropertySource(properties = {
         "jwt.public-key-path=classpath:keys/test_public_key.pem",
         "jwt.issuer=medilabo-gateway"
@@ -63,6 +76,12 @@ class SecurityConfigTest {
 
     @MockitoBean
     private NoteService noteService;
+
+    @Test
+    void should_return200_when_actuator_health_called_without_token() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
 
     @Test
     void should_return401_when_no_authorization_header() throws Exception {

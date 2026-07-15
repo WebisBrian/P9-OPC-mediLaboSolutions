@@ -33,6 +33,7 @@ public class SecurityConfig {
         return http
                 .httpBasic(Customizer.withDefaults())
                 .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers("/actuator/health").permitAll()
                         .anyExchange().authenticated())
                 // CSRF désactivé : API stateless HTTP Basic, pas de session cookie
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
