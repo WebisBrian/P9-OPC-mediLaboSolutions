@@ -59,4 +59,4 @@ Détail des règles de calcul : `docs/features/SPRINT3.md`.
 
 ## Lancement en local sans Docker (optionnel)
 
-Pour déboguer un service depuis l'IDE : chaque module reste lançable individuellement (`./run-dev.sh <service>` ou exécution directe depuis l'IDE), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`) ; credentials par service via un `.env` local à chaque module (voir `<service>/.env.example`). Détail des conventions : `CLAUDE.md`.
+Pour déboguer un service depuis l'IDE : lancer directement la classe `@SpringBootApplication` du module voulu (ex. `PatientServiceApplication`), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`). Les credentials (base de données, gateway) sont à fournir via les variables d'environnement du run configuration de l'IDE, en reprenant les valeurs du `.env` local de chaque module (voir `<service>/.env.example`). Détail des conventions : `CLAUDE.md`.

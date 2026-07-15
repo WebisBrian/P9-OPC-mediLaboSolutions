@@ -27,7 +27,7 @@ Java 21 · **Spring Boot 3.5.x** · Maven · PostgreSQL via Spring Data JPA · M
 ### Outillage
 
 - **Build/run en ligne de commande : `mvn` (Maven système installé), PAS `./mvnw`.** Le wrapper `./mvnw` est muet sous Git Bash dans cet environnement ; le `mvn` système (sur JDK 21) fonctionne. Utiliser `mvn clean test`, `mvn spring-boot:run`, etc.
-- Shell : Git Bash. Lancement de chaque service back via un script `run-dev.sh` qui charge un `.env` (variables DB) avant `mvn spring-boot:run`.
+- Shell : Git Bash. Lancement standard via `docker compose up --build` (S5) ; pour déboguer un service en IDE, lancer directement sa classe `@SpringBootApplication` (les configurations ont un défaut `localhost`), credentials à fournir via les variables d'environnement du run configuration.
 
 ---
 
