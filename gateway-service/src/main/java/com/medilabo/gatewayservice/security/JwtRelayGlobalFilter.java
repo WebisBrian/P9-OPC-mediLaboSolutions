@@ -29,6 +29,15 @@ public class JwtRelayGlobalFilter implements GlobalFilter, Ordered {
         this.jwtIssuer = jwtIssuer;
     }
 
+    /**
+     * Récupère l'utilisateur authentifié dans le {@code SecurityContext} réactif, fait émettre
+     * un JWT à son nom par {@link JwtIssuer}, puis le pose en {@code Authorization: Bearer} sur
+     * la requête avant qu'elle ne poursuive vers le back ciblé.
+     *
+     * @param exchange la requête/réponse en cours, mutée pour porter le nouveau header
+     * @param chain    la suite de la chaîne de filtres gateway à invoquer
+     * @return un {@link Mono} qui complète une fois la requête (éventuellement mutée) transmise à la chaîne
+     */
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         return ReactiveSecurityContextHolder.getContext()
@@ -39,6 +48,15 @@ public class JwtRelayGlobalFilter implements GlobalFilter, Ordered {
                 .flatMap(chain::filter);
     }
 
+    /**
+     * Construit une copie de l'exchange dont le header {@code Authorization} porte le JWT émis,
+     * en remplacement (et non en complément) de tout header {@code Authorization} déjà présent
+     * (le {@code Basic} entrant du client, notamment).
+     *
+     * @param exchange l'exchange d'origine, non modifié
+     * @param token    le JWT sérialisé à injecter
+     * @return un nouvel {@link ServerWebExchange} portant la requête mutée
+     */
     private ServerWebExchange withBearerToken(ServerWebExchange exchange, String token) {
         ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                 .headers(headers -> headers.set(HttpHeaders.AUTHORIZATION, "Bearer " + token))

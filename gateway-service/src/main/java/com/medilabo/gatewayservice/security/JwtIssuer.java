@@ -54,6 +54,14 @@ public class JwtIssuer {
         this.expirationSeconds = expirationSeconds;
     }
 
+    /**
+     * Émet un JWT RS256 signé portant l'identité de l'utilisateur authentifié en Basic
+     * à la gateway (claim {@code sub}), destiné à être injecté en {@code Authorization: Bearer}
+     * vers le service back appelé.
+     *
+     * @param username l'utilisateur authentifié, tel qu'extrait du {@code SecurityContext} réactif
+     * @return le JWT sérialisé (compact, prêt à être utilisé tel quel dans un header)
+     */
     public String issue(String username) {
         Instant now = Instant.now();
         JWTClaimsSet claims = new JWTClaimsSet.Builder()
@@ -71,6 +79,13 @@ public class JwtIssuer {
         return signedJwt.serialize();
     }
 
+    /**
+     * Lit la clé privée RS256 de la gateway depuis un fichier PEM (PKCS#8) et la convertit
+     * en {@link PrivateKey} utilisable par le {@link RSASSASigner} pour signer les JWT émis.
+     *
+     * @param resource le fichier PEM de la clé privée (chemin configuré via {@code jwt.private-key-path})
+     * @return la clé privée décodée, prête à signer
+     */
     private static PrivateKey loadPrivateKey(Resource resource) {
         try (InputStream in = resource.getInputStream()) {
             String pem = new String(in.readAllBytes(), StandardCharsets.UTF_8);
