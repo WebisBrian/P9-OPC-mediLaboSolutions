@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *     @Configuration hors controllers ; on fournit explicitement SecurityWebFilterChain,
  *     PasswordEncoder et MapReactiveUserDetailsService.
  *
- * @TestPropertySource satisfait les @Value de SecurityConfig sans dépendre du .env réel
+ * @TestPropertySource satisfait les @Value de SecurityConfig sans dépendre des variables d'environnement réelles
  * (non disponible en CI). Le même couple user/password est réutilisé dans les tests
  * pour construire les vrais en-têtes HTTP Basic — la chaîne d'encodage BCrypt est ainsi
  * exercée de bout en bout.

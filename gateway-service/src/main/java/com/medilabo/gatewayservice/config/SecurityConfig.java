@@ -20,8 +20,7 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class SecurityConfig {
 
     // @Value résout les variables d'environnement nativement : pas besoin de relais
-    // dans application.properties. Les variables sont chargées par run-dev.sh/.ps1
-    // depuis gateway-service/.env avant le lancement du service.
+    // dans application.yml. Les variables sont chargées par docker-compose à la racine du projet
     @Value("${SECURITY_USERNAME}")
     private String username;
 
