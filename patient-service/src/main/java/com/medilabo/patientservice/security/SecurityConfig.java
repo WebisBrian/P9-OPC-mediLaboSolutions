@@ -47,6 +47,15 @@ public class SecurityConfig {
     @Value("${jwt.issuer}")
     private String issuer;
 
+    /**
+     * Chaîne de filtres HTTP du service : STATELESS (pas de session servlet), CSRF désactivé
+     * (API sans cookie de session), {@code /actuator/health} en accès libre pour le healthcheck
+     * Docker, toute autre requête exige un JWT valide via le resource server OAuth2.
+     *
+     * @param http       le builder de configuration fourni par Spring Security
+     * @param jwtDecoder le décodeur/validateur JWT (signature, expiration, issuer) à utiliser
+     * @return la chaîne de filtres construite
+     */
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtDecoder jwtDecoder) throws Exception {
         http
@@ -75,6 +84,14 @@ public class SecurityConfig {
         return decoder;
     }
 
+    /**
+     * Lit la clé publique RS256 de la gateway depuis un fichier PEM (X.509/SPKI) et la convertit
+     * en {@link RSAPublicKey} utilisable par {@link NimbusJwtDecoder} pour vérifier la signature
+     * des JWT reçus.
+     *
+     * @param resource le fichier PEM de la clé publique (chemin configuré via {@code jwt.public-key-path})
+     * @return la clé publique décodée, prête à vérifier une signature
+     */
     private static RSAPublicKey loadPublicKey(Resource resource) {
         try (InputStream in = resource.getInputStream()) {
             String pem = new String(in.readAllBytes(), StandardCharsets.UTF_8);

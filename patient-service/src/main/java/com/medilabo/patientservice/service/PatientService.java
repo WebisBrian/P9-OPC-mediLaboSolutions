@@ -54,6 +54,16 @@ public class PatientService {
         return response;
     }
 
+    /**
+     * Refuse la création/modification si un autre patient partage déjà même nom/prénom
+     * (insensible à la casse), date de naissance et téléphone. Sans téléphone renseigné,
+     * aucune vérification n'est effectuée : ce n'est pas un critère fiable à lui seul.
+     *
+     * @param request   les données du patient à créer/modifier
+     * @param excludeId lors d'une modification, l'id du patient à exclure de la recherche
+     *                  (pour ne pas le détecter comme doublon de lui-même) ; {@code null} en création
+     * @throws DuplicatePatientException si un autre patient correspond déjà à ces critères
+     */
     private void checkForDuplicate(PatientRequest request, Long excludeId) {
         String phone = request.getPhone() != null ? request.getPhone().trim() : null;
         if (phone == null || phone.isEmpty()) {
