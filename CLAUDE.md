@@ -153,7 +153,7 @@ Trois segments, trois mécanismes (modèle révisé au S4 — le secret partagé
 
 ## Algorithme d'assessment (cœur métier)
 
-Pièce la plus importante et la plus à risque de régression. Règles complètes dans `docs/features/assessment.md`.
+Pièce la plus importante et la plus à risque de régression. Règles complètes dans `docs/features/5. assessment.md`.
 
 - Incorporer toutes les règles (4 niveaux : None, Borderline, In Danger, Early onset).
 - Recherche des termes déclencheurs **insensible à la casse** dans les notes.
@@ -172,7 +172,7 @@ Pièce la plus importante et la plus à risque de régression. Règles complète
 
 ## Documentation feature
 
-Toute feature documentée dans `docs/features/<feature>.md` : résumé, endpoints, architecture impactée, décisions/hypothèses, comment tester, limitations.
+Toute feature documentée dans `docs/features/` : résumé, endpoints, architecture impactée, décisions/hypothèses, comment tester, limitations. Fichiers numérotés dans l'ordre de lecture recommandé (`1. architecture.md` → `2. security.md` → `3. patient-crud.md` → `4. notes.md` → `5. assessment.md`) : les deux premiers sont des sujets transversaux (toute la stack), les trois suivants une feature chacun.
 
 ---
 
@@ -187,12 +187,13 @@ Ports : gateway 8080, patient 8081, frontend 8082, notes 8083, assessment 8084.
     - patient-service : CRUD `/patients`, validation durcie (format/longueur), dédup patient (409), `GlobalExceptionHandler` (404/409/400), seeding 4 patients OPC, tests verts. SB 3.5.x.
     - gateway-service : Spring Cloud Gateway, route `/patients/**`, auth Basic centralisée (BCrypt, in-memory).
     - frontend-service : UI Thymeleaf sobre, login maison, `PatientGatewayClient`, CRUD complet, validation alignée + gestion 409.
-    - Détail complet : `docs/features/SPRINT1.md`.
+    - Détail complet : `docs/features/3. patient-crud.md`.
 - **S2 — TERMINÉ** : notes-service (MongoDB, port 8083), route gateway `/notes/**`, `NoteGatewayClient` au front, affichage des notes sur la page détail patient (historique paginé + formulaire d'ajout). Migration des tests d'intégration BDD de H2 vers Testcontainers (patient inclus, rétroactivement).
-    - Détail complet : `docs/features/SPRINT2.md`.
+    - Détail complet : `docs/features/4. notes.md`.
 - **S3 — TERMINÉ** : assessment-service (port 8084, sans BDD, interroge patient + notes en direct), calcul du risque diabète (`RiskCalculator` + `TriggerDetector`, TDD), route gateway `/assessment/**`, `AssessmentGatewayClient` au front, affichage du niveau de risque + déclencheurs sur la page détail patient.
-    - Détail complet : `docs/features/SPRINT3.md`.
+    - Détail complet : `docs/features/5. assessment.md`.
 - **S4 — TERMINÉ** (itération sécurité, hors périmètre OPC) : migration du secret partagé `X-Gateway-Secret` vers un JWT RS256 signé. Émission côté gateway (`JwtIssuer` + `JwtRelayGlobalFilter`), validation via resource-server standard sur les trois backs (patient, notes, assessment), relay (sans forge) du token par assessment vers patient/notes via `RelayedJwtProvider`. `GatewaySecretFilter` supprimé partout. Voir section Sécurité ci-dessus pour le détail du mécanisme.
-    - Détail complet : `docs/features/SPRINT4.md` (à générer).
-- **S5 — à démarrer** : dockerisation (un `Dockerfile` par service + `docker-compose.yml` global à la racine). Point de vigilance : les base-urls d'assessment vers patient/notes (`patient-service.base-url`, `notes-service.base-url`, aujourd'hui `http://localhost:8081`/`8083`) devront pointer vers les noms de services Docker Compose plutôt que `localhost`. Ajouter Spring Boot Actuator uniformément (healthchecks compose).
+    - Détail complet : `docs/features/2. security.md`.
+- **S5 — TERMINÉ** : dockerisation. Un `Dockerfile` multi-stage par service + `docker-compose.yml` unique à la racine (7 conteneurs : 5 services + `postgres` + `mongo`). Base-urls d'assessment et routes gateway externalisées vers les noms de services Docker Compose. Spring Boot Actuator ajouté uniformément (`/actuator/health`, healthchecks compose + `depends_on: service_healthy` en cascade). Un seul port publié sur l'hôte (8082, frontend) ; `run-dev.sh`/`.ps1` retirés, Docker devient le mode de lancement unique.
+    - Détail complet : `docs/features/1. architecture.md`.
 - **S6 — à démarrer** : section Green Code du README (analyse + pistes de refactoring).

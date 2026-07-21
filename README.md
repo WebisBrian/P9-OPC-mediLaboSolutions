@@ -41,7 +41,7 @@ Le seeding au démarrage crée 4 patients de test, chacun conçu pour illustrer 
 | TestInDanger | < 30 ans, M | Fumeur, Anormal, Cholestérol (3) | **In Danger** |
 | TestEarlyOnset | < 30 ans, F | Hémoglobine A1C, Taille, Poids, Fumeur, Cholestérol, Vertiges, Réaction, Anticorps (8) | **Early onset** |
 
-Détail des règles de calcul : `docs/features/SPRINT3.md`.
+Détail des règles de calcul : `docs/features/5. assessment.md`.
 
 **Parcours de vérification** : se connecter → la liste affiche les 4 patients → cliquer sur un patient → la page détail affiche ses informations, l'historique paginé de ses notes, et un badge d'évaluation du risque (avec la liste des déclencheurs détectés) cohérent avec le tableau ci-dessus.
 
@@ -59,4 +59,4 @@ Détail des règles de calcul : `docs/features/SPRINT3.md`.
 
 ## Lancement en local sans Docker (optionnel)
 
-Pour déboguer un service depuis l'IDE : lancer directement la classe `@SpringBootApplication` du module voulu (ex. `PatientServiceApplication`), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`). Les credentials (base de données, gateway) sont à fournir via les variables d'environnement du run configuration de l'IDE, en reprenant les valeurs du `.env` local de chaque module (voir `<service>/.env.example`). Détail des conventions : `CLAUDE.md`.
+Pour déboguer un service depuis l'IDE : lancer directement la classe `@SpringBootApplication` du module voulu (ex. `PatientServiceApplication`), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`). Les credentials (base de données, gateway) sont à fournir via les variables d'environnement du run configuration de l'IDE, en reprenant les mêmes noms/valeurs que le `.env`/`.env.example` à la racine (`DB_USERNAME`, `DB_PASSWORD`, `SECURITY_USERNAME`, `SECURITY_PASSWORD`...). Détail des conventions : `CLAUDE.md`.
