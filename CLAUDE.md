@@ -93,7 +93,7 @@ SOLID = boussole, pas dogme. Chaque abstraction doit se justifier par un besoin 
 
 ## Tests
 
-- Approche pragmatique : **code puis tests** sur le CRUD classique (logique triviale). **TDD réservé à l'algorithme d'assessment (S3)**, où les règles précises et les cas-frontière justifient d'écrire les tests d'abord.
+- Approche pragmatique : **code puis tests** sur le CRUD classique (logique triviale).
 - Nommage explicite : `should_<expected>_when_<condition>`.
 - Distinguer **unit** (logique métier : services, mappers, surtout l'algorithme d'assessment ; repository mocké) et **integration/web** (endpoints via `@WebMvcTest`, service mocké).
 - Tests d'intégration BDD sur **Testcontainers** (abandon de H2 dès le S2) : `postgres:16` pour patient-service, `mongo:7` pour notes-service. Pattern : conteneur `static` + `@Container` + `@ServiceConnection`, pas de config de datasource manuelle. Ces tests exigent Docker actif localement et en CI ; les tests unitaires (service, mapper, algorithme d'assessment) n'en dépendent pas.
@@ -106,32 +106,23 @@ Les services back qui chargent le contexte Spring complet (`@SpringBootTest`) do
 
 ## Sécurité
 
-Trois segments, trois mécanismes (modèle révisé au S4 — le secret partagé initial a été remplacé par un JWT signé) :
+Trois segments, trois mécanismes : session `JSESSIONID` (navigateur↔frontend) · HTTP Basic rejoué depuis la session (frontend↔gateway) · JWT RS256 signé en `Authorization: Bearer` (gateway↔backs, avec relais par assessment vers patient/notes). Modèle complet (flux, claims, rationale RS256, clés, limites) : `docs/features/2. security.md`.
 
-| Segment | Mécanisme |
-|---|---|
-| navigateur ↔ frontend | Session serveur (`JSESSIONID`) — inchangé |
-| frontend ↔ gateway | HTTP Basic (creds utilisateur rejoués depuis la session) — inchangé |
-| gateway ↔ services back | **JWT RS256 signé** (header `Authorization: Bearer`) |
+Points d'implémentation propres à ce repo, non couverts par la doc feature (écrite pour la compréhension, pas pour l'implémentation) :
 
-- **Auth utilisateur centralisée à la gateway** : HTTP Basic, utilisateurs in-memory, mots de passe BCrypt (obligatoire). Pas d'inscription, pas de rôles. Gateway = WebFlux réactif → `SecurityWebFilterChain` + `ServerHttpSecurity` en bean (PAS `SecurityFilterChain`/`HttpSecurity`, qui sont l'API servlet réservée aux backs ; PAS de `WebSecurityConfigurerAdapter` déprécié). Cette couche est inchangée par la migration S4.
-- **Stack de sécurité selon le module** : gateway = réactive (`SecurityWebFilterChain` + `ServerHttpSecurity`) car WebFlux ; services back = servlet (`SecurityFilterChain` + `HttpSecurity`) car MVC/Tomcat. Ne jamais copier le pattern d'un module vers l'autre sans adapter la stack.
-- **Émission du JWT (gateway)** : après authentification Basic réussie, un `JwtIssuer` forge un JWT signé RS256 avec la clé PRIVÉE de la gateway. Claims strictement `sub` (username), `iss` (`medilabo-gateway`), `iat`, `exp` — pas de rôles/scopes. Expiration courte (60s, configurable) : le token ne vit que le temps d'un hop interne gateway→back. Un `JwtRelayGlobalFilter` (`GlobalFilter` Spring Cloud Gateway, contexte réactif via `ReactiveSecurityContextHolder`) l'injecte sur chaque requête sortante et ÉCRASE l'`Authorization: Basic` entrant — les credentials utilisateur ne franchissent jamais la gateway vers les backs.
-- **Validation du JWT (chaque service back)** : `spring-boot-starter-oauth2-resource-server` (resource-server standard Spring Security, PAS de filtre de validation maison — la validation JWT artisanale introduit des failles classiques : `alg:none`, confusion RS256/HS256, expiration non vérifiée). `SecurityConfig` : STATELESS + `anyRequest().authenticated()` (remplace l'ancien `permitAll()`) + bean `JwtDecoder` (`NimbusJwtDecoder.withPublicKey(...)` + `setJwtValidator(JwtValidators.createDefaultWithIssuer(issuer))`, qui valide signature RS256, expiration ET issuer). Fail-fast si la clé publique est absente/illisible au démarrage. Requête sans token valide → **401** (et non plus 403).
-- **Propriété centrale** : seule la gateway détient la clé privée RS256. Aucun back ne peut forger de token — le JWT porte à la fois l'identité (`sub`) et la provenance (signature vérifiable avec la clé publique) en un seul mécanisme cryptographique.
-- **Cas assessment-service (double rôle)** : c'est le seul back qui est à la fois serveur (valide le JWT entrant comme les autres) ET client (appelle patient/notes en direct). Il ne forge JAMAIS de token : il RELAIE tel quel celui qu'il a reçu, via `RelayedJwtProvider.currentTokenValue()` → `jwt.getTokenValue()`, lu dans le `SecurityContextHolder` **synchrone** (assessment est servlet, pas réactif — ne pas confondre avec `ReactiveSecurityContextHolder` côté gateway). L'identité de l'utilisateur d'origine traverse ainsi toute la chaîne d'agrégation jusqu'à patient et notes.
-- **Clés RS256** : paire générée par `scripts/generate-keys.sh` (clé privée PKCS#8 PEM pour la gateway, clé publique X.509/SPKI PEM dupliquée dans chaque back). Clés de PROD non versionnées (`.gitignore` : `**/src/main/resources/keys/*.pem`). Clés de TEST jetables, committées dans `src/test/resources/keys/` de chaque service (nécessaires pour que les tests `@SpringBootTest` passent en CI sans la clé de prod).
-- **Consigne pour tout nouveau service back** : porter la même `SecurityConfig` (resource-server JWT, pas de filtre maison) et recevoir la clé publique via `scripts/generate-keys.sh`. Cette consigne **remplace** l'ancienne exigence de porter un `GatewaySecretFilter`.
-- Principe : *centralisé ≠ exclusif*. Le back ne ré-authentifie pas l'utilisateur ; il vérifie seulement la validité et la provenance du JWT émis par la gateway. Défense en profondeur = JWT + isolation réseau Docker (S5).
-- **Secrets** : aucun secret en dur. Credentials (auth gateway HTTP Basic, DB Postgres/Mongo) via variables d'env / `.env` (gitignore, `.env.example` versionné). Docker Compose lit ces variables. Les CHEMINS de clés (`JWT_PRIVATE_KEY_PATH`, `JWT_PUBLIC_KEY_PATH`) ne sont PAS des secrets : ils ont un défaut (`classpath:keys/...`) directement dans les `.properties`/`.yml` de chaque service et n'ont pas besoin de figurer dans `.env`.
-- Le **front n'a pas de `.env`** : pas de compte de service, les credentials viennent de l'utilisateur via une page de login (login maison léger, pas de Spring Security sur le front — voir conventions front).
+- **Stack de sécurité selon le module** : gateway = réactive (`SecurityWebFilterChain` + `ServerHttpSecurity`, WebFlux) ; services back = servlet (`SecurityFilterChain` + `HttpSecurity`, MVC/Tomcat). Ne jamais copier le pattern d'un module vers l'autre sans adapter la stack.
+- **Lecture du JWT côté assessment** (`RelayedJwtProvider`) : `SecurityContextHolder` **synchrone** (assessment est servlet, pas réactif) — ne pas confondre avec `ReactiveSecurityContextHolder` côté gateway.
+- **Consigne pour tout nouveau service back** : porter la même `SecurityConfig` (resource-server JWT standard, pas de filtre maison) et recevoir la clé publique via `scripts/generate-keys.sh`.
 
-### Validation (multi-couches, règle du projet)
+---
+
+## Validation (multi-couches, règle du projet)
 - **Back = rempart d'intégrité** : Bean Validation `@Valid` sur les DTO d'entrée (présence + format + longueur), règles métier en Java (assessment), préconditions dans le service. Le back ne fait jamais confiance à l'extérieur, **y compris au frontend** (un appel direct à la gateway contourne le front).
 - **Front = UX** : mêmes règles de format/longueur répliquées sur les formulaires (feedback immédiat), mais le front ne garantit rien — il ne fait que du confort.
 - **Règles identiques des deux côtés, SANS partage de code** (pas de module commun : couplage entre microservices écarté). Discipline de cohérence, pas de dépendance partagée.
 - Règles patient de référence : nom/prénom `@Size(max=100)` + `@Pattern([\p{L} '-]+)` (lettres Unicode + espace/tiret/apostrophe, pas de chiffres) ; phone `@Size(max=20)` + `@Pattern([0-9 +().-]*)` ; address `@Size(max=255)`.
 - **Déduplication métier** (relationnelle, back uniquement — le front ne peut pas la vérifier localement) : un doublon lève une exception métier → **409 Conflict**, que le front traduit en message utilisateur clair.
+
 ---
 
 ## Gestion d'erreurs
