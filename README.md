@@ -6,29 +6,28 @@ Voir `CLAUDE.md` pour le cadrage complet (stack, conventions, sécurité, décou
 
 ## Lancement de l'application
 
-Prérequis unique : **Docker Desktop**. Ni Java, ni Maven, ni PostgreSQL, ni MongoDB à installer — tout tourne en conteneurs.
+Prérequis unique : **Docker Desktop**. Ni Java, ni Maven, ni PostgreSQL, ni MongoDB à installer. Tout tourne en conteneurs.
 
 ```bash
 ./scripts/generate-keys.sh
+```
+
+```bash
 docker compose up --build
 ```
 
 Puis ouvrir **http://localhost:8082** et se connecter avec :
 
-- **Identifiant** : `admin`
+- **Identifiant** : `user`
 - **Mot de passe** : `medilabo`
 
 ### Pourquoi `generate-keys.sh` d'abord
 
-La sécurité interne (gateway → services back) repose sur un JWT signé en **RS256**. La clé privée de signature ne se commit jamais dans un dépôt Git, même en contexte de démonstration — chaque environnement doit générer la sienne. Cette commande génère localement la paire de clés (non versionnée, ignorée par Git) et la place aux emplacements attendus par la gateway et les 3 services back ; le build Docker les embarque ensuite dans les images. Sans cette étape, les conteneurs refusent de démarrer (fail-fast, clé absente).
+La sécurité interne (gateway → services back) repose sur un JWT signé en **RS256**. La clé privée de signature ne se commit jamais dans un dépôt Git, même en contexte de démonstration, chaque environnement doit générer la sienne. Cette commande génère localement la paire de clés (non versionnée, ignorée par Git) et la place aux emplacements attendus par la gateway et les 3 services back. Le build Docker les embarque ensuite dans les images. Sans cette étape, les conteneurs refusent de démarrer (fail-fast, clé absente).
 
-### Premier `up --build` : compter 5 à 10 minutes
+### Premier `up --build`
 
-Chaque service se construit dans son propre conteneur (build Maven multi-stage inclus) : la première exécution télécharge les dépendances Maven et les images de base pour les 5 modules, ce qui prend plusieurs minutes selon la connexion. Ce n'est **pas un blocage** — les lancements suivants réutilisent le cache Docker et sont nettement plus rapides. `docker compose logs -f` permet de suivre la progression si besoin.
-
-### `.env` (optionnel)
-
-Le compose fournit des identifiants de démonstration fonctionnels par défaut (voir `.env.example`) : `docker compose up --build` fonctionne **sans créer de `.env`**. Pour personnaliser les credentials (PostgreSQL, MongoDB, authentification gateway), copier `.env.example` en `.env` à la racine (fichier gitignoré) et modifier les valeurs souhaitées.
+Chaque service se construit dans son propre conteneur (build Maven multi-stage inclus) : la première exécution télécharge les dépendances Maven et les images de base pour les 5 modules, ce qui peut prendre plusieurs minutes selon la connexion. `docker compose logs -f` permet de suivre la progression si besoin.
 
 ## Vérification rapide
 
@@ -56,7 +55,3 @@ Détail des règles de calcul : `docs/features/5. assessment.md`.
 | `assessment-service` | 8084 | Calcul du risque diabète (interroge patient + notes en direct) | — |
 
 **Seul le port 8082 est publié sur l'hôte.** La gateway est le point d'entrée unique du système ; elle-même, les 3 services back et les bases de données ne sont joignables que sur le réseau Docker interne (`medilabo-net`), jamais depuis l'extérieur — le réseau matérialise cette contrainte, pas seulement la convention applicative.
-
-## Lancement en local sans Docker (optionnel)
-
-Pour déboguer un service depuis l'IDE : lancer directement la classe `@SpringBootApplication` du module voulu (ex. `PatientServiceApplication`), les configurations ayant toutes un défaut `localhost` (bases de données locales, autres services sur `localhost:<port>`). Génération des clés RS256 identique (`./scripts/generate-keys.sh`). Les credentials (base de données, gateway) sont à fournir via les variables d'environnement du run configuration de l'IDE, en reprenant les mêmes noms/valeurs que le `.env`/`.env.example` à la racine (`DB_USERNAME`, `DB_PASSWORD`, `SECURITY_USERNAME`, `SECURITY_PASSWORD`...). Détail des conventions : `CLAUDE.md`.
