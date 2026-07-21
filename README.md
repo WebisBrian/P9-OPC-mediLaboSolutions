@@ -40,7 +40,7 @@ Le seeding au démarrage crée 4 patients de test, chacun conçu pour illustrer 
 | TestInDanger | < 30 ans, M | Fumeur, Anormal, Cholestérol (3) | **In Danger** |
 | TestEarlyOnset | < 30 ans, F | Hémoglobine A1C, Taille, Poids, Fumeur, Cholestérol, Vertiges, Réaction, Anticorps (8) | **Early onset** |
 
-Détail des règles de calcul : `docs/features/5. assessment.md`.
+Détail des règles de calcul : `docs/features/6. assessment.md`.
 
 **Parcours de vérification** : se connecter → la liste affiche les 4 patients → cliquer sur un patient → la page détail affiche ses informations, l'historique paginé de ses notes, et un badge d'évaluation du risque (avec la liste des déclencheurs détectés) cohérent avec le tableau ci-dessus.
 

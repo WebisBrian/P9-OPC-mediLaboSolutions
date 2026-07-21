@@ -102,7 +102,7 @@ services:
       dockerfile: gateway-service/Dockerfile
     image: medilabo/gateway-service
     environment:
-      SECURITY_USERNAME: ${SECURITY_USERNAME:-admin}
+      SECURITY_USERNAME: ${SECURITY_USERNAME:-user}
       SECURITY_PASSWORD: ${SECURITY_PASSWORD:-medilabo}
       PATIENT_SERVICE_URL: http://patient-service:8081
       NOTES_SERVICE_URL: http://notes-service:8083
