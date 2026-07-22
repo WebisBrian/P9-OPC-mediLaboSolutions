@@ -55,3 +55,27 @@ Détail des règles de calcul : `docs/features/6. assessment.md`.
 | `assessment-service` | 8084 | Calcul du risque diabète (interroge patient + notes en direct) | — |
 
 **Seul le port 8082 est publié sur l'hôte.** La gateway est le point d'entrée unique du système ; elle-même, les 3 services back et les bases de données ne sont joignables que sur le réseau Docker interne (`medilabo-net`), jamais depuis l'extérieur — le réseau matérialise cette contrainte, pas seulement la convention applicative.
+
+---
+
+## Green Code
+
+### Objectif
+Le Green Code vise à délivrer le service attendu avec le minimum de ressources : énergie (CPU/RAM), matériel (un logiciel sobre évite le renouvellement anticipé — l'essentiel de l'empreinte carbone d'une machine vient de sa fabrication), et données réseau. Moins de ressources consommées = moins d'électricité et une durée de vie matérielle allongée.
+
+### Comment identifier le code énergivore
+On mesure avant d'optimiser (optimiser à l'aveugle est un anti-pattern) :
+- **Profiling JVM** (VisualVM, Java Flight Recorder) : allocations excessives, objets temporaires créés en boucle, pression sur le Garbage Collector.
+- **Analyse statique** (SonarQube) : anti-patterns de performance sans exécuter le code.
+- **Réseau/DB** : taille des payloads, appels inter-services redondants, requêtes N+1.
+
+### Décisions Green déjà présentes par conception
+- **Images Docker multi-stage** : l'image runtime (`21-jre`) ne contient ni JDK ni Maven → plus petite, moins de stockage, moins de bande passante au pull, démarrage plus rapide.
+- **Pagination des notes** (`/notes?page&size`) : l'historique complet n'est jamais chargé en mémoire.
+- **Rendu serveur Thymeleaf** (pas de SPA, pas de bundle JS) : moins de CPU navigateur et de bande passante côté client.
+- **Un seul port publié** : surface réseau minimale.
+
+### Pistes d'amélioration identifiées (non implémentées)
+- **Cache de validation JWT** : chaque back valide la signature RS256 à chaque requête entrante — vérification cryptographique asymétrique, coûteuse en CPU. Mettre en cache le résultat de validation (clé = hash du token, l'`exp` du token, soit 60 s max) éviterait de rejouer la vérification pour un même token sur des requêtes rapprochées. Gain net sur les pages détail patient, qui déclenchent 3 appels back (patient, notes, assessment) avec le même token.
+- **Pagination de la liste des patients** : `GET /patients` retourne aujourd'hui la totalité des patients en une seule réponse. Sur un volume réaliste de clinique, cela charge inutilement la base, le payload réseau et la mémoire du frontend. Aligner ce endpoint sur le modèle déjà appliqué aux notes (`page`/`size`) est la piste la plus directement transposable.
+- **Cache court sur assessment-service** : le risque est recalculé à chaque appel via 2 requêtes réseau (patient + notes). Un cache réduirait ces allers-retours.
